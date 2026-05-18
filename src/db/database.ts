@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import type { Esame, Modulo, SessioneStudio } from './types';
+import type { Esame, Modulo, SessioneStudio, Lezione } from './types';
 
 let _db: SQLite.SQLiteDatabase | null = null;
 
@@ -44,7 +44,21 @@ export function initDatabase(): void {
       data TEXT NOT NULL,
       FOREIGN KEY (esame_id) REFERENCES esami(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS lezioni (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL,
+      professore TEXT,
+      giorno INTEGER NOT NULL,
+      ora_inizio TEXT NOT NULL,
+      ora_fine TEXT NOT NULL,
+      aula TEXT NOT NULL,
+      colore TEXT NOT NULL DEFAULT '#7C4DFF'
+    );
   `);
+
+  // Migrazioni
+  try { db().runSync('ALTER TABLE esami ADD COLUMN professore TEXT;'); } catch {}
 }
 
 // --- Impostazioni ---
@@ -79,11 +93,12 @@ export function insertEsame(
   nome: string,
   cfu: number,
   tipo: 'voto' | 'tirocinio',
+  professore?: string,
   ore_tirocinio_target?: number
 ): number {
   const result = db().runSync(
-    'INSERT INTO esami (nome, cfu, tipo, ore_tirocinio_target, superato, created_at) VALUES (?, ?, ?, ?, 0, ?)',
-    nome, cfu, tipo, ore_tirocinio_target ?? null, new Date().toISOString()
+    'INSERT INTO esami (nome, cfu, tipo, professore, ore_tirocinio_target, superato, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)',
+    nome, cfu, tipo, professore ?? null, ore_tirocinio_target ?? null, new Date().toISOString()
   );
   return result.lastInsertRowId;
 }
@@ -149,6 +164,33 @@ export function getSessioniRecenti(esameId: number): SessioneStudio[] {
     'SELECT * FROM sessioni_studio WHERE esame_id = ? ORDER BY data DESC LIMIT 10',
     esameId
   );
+}
+
+// --- Lezioni ---
+
+export function getAllLezioni(): Lezione[] {
+  return db().getAllSync<Lezione>(
+    'SELECT * FROM lezioni ORDER BY giorno ASC, ora_inizio ASC'
+  );
+}
+
+export function insertLezione(
+  nome: string,
+  professore: string | null,
+  giorno: number,
+  ora_inizio: string,
+  ora_fine: string,
+  aula: string,
+  colore: string
+): void {
+  db().runSync(
+    'INSERT INTO lezioni (nome, professore, giorno, ora_inizio, ora_fine, aula, colore) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    nome, professore, giorno, ora_inizio, ora_fine, aula, colore
+  );
+}
+
+export function deleteLezione(id: number): void {
+  db().runSync('DELETE FROM lezioni WHERE id = ?', id);
 }
 
 // --- Stats globali ---

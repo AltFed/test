@@ -15,9 +15,6 @@ export default function TabLayout() {
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        headerStyle: { backgroundColor: colors.background },
-        headerTintColor: colors.textPrimary,
-        headerShadowVisible: false,
         headerShown: false,
       }}
     >
@@ -45,6 +42,15 @@ export default function TabLayout() {
           title: 'Studio',
           tabBarIcon: ({ color, size }: IconProps) => (
             <MaterialCommunityIcons name="timer-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="orario"
+        options={{
+          title: 'Orario',
+          tabBarIcon: ({ color, size }: IconProps) => (
+            <MaterialCommunityIcons name="calendar-clock" size={size} color={color} />
           ),
         }}
       />

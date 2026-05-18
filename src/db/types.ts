@@ -4,6 +4,7 @@ export type ModuloType = 'scritto' | 'orale' | 'progetto' | 'ore';
 export interface Esame {
   id: number;
   nome: string;
+  professore: string | null;
   cfu: number;
   tipo: ExamType;
   voto_finale: number | null;
@@ -26,4 +27,15 @@ export interface SessioneStudio {
   esame_id: number;
   durata_minuti: number;
   data: string;
+}
+
+export interface Lezione {
+  id: number;
+  nome: string;
+  professore: string | null;
+  giorno: number; // 0=Lunedì … 4=Venerdì
+  ora_inizio: string; // "09:00"
+  ora_fine: string;   // "11:00"
+  aula: string;
+  colore: string;     // hex
 }

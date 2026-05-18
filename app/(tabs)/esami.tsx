@@ -2,29 +2,36 @@ import { useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import {
   Text,
-  Card,
   FAB,
   Portal,
   Dialog,
   Button,
   TextInput,
   SegmentedButtons,
-  Chip,
   Menu,
   IconButton,
+  Divider,
 } from 'react-native-paper';
 import { useFocusEffect, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '@/theme';
-import {
-  getAllEsami,
-  insertEsame,
-  deleteEsame,
-  getOreStudiate,
-} from '@/db/database';
+import { getAllEsami, insertEsame, deleteEsame, getOreStudiate } from '@/db/database';
 import type { Esame } from '@/db/types';
 
 type Filtro = 'tutti' | 'da_fare' | 'superati';
+
+const ACCENT_COLORS = [
+  colors.primary,
+  colors.secondary,
+  colors.warning,
+  colors.success,
+  '#FF6B9D',
+  '#C084FC',
+];
+
+function accentForIndex(i: number): string {
+  return ACCENT_COLORS[i % ACCENT_COLORS.length];
+}
 
 export default function EsamiScreen() {
   const [esami, setEsami] = useState<Esame[]>([]);
@@ -33,8 +40,8 @@ export default function EsamiScreen() {
   const [menuEsameId, setMenuEsameId] = useState<number | null>(null);
   const [oreMap, setOreMap] = useState<Record<number, number>>({});
 
-  // Campi form
   const [nome, setNome] = useState('');
+  const [professore, setProfessore] = useState('');
   const [cfu, setCfu] = useState('');
   const [tipo, setTipo] = useState<'voto' | 'tirocinio'>('voto');
   const [oreTarget, setOreTarget] = useState('');
@@ -43,9 +50,7 @@ export default function EsamiScreen() {
     const list = getAllEsami();
     setEsami(list);
     const map: Record<number, number> = {};
-    list.forEach((e) => {
-      map[e.id] = getOreStudiate(e.id);
-    });
+    list.forEach((e) => { map[e.id] = getOreStudiate(e.id); });
     setOreMap(map);
   }, []);
 
@@ -63,27 +68,18 @@ export default function EsamiScreen() {
       nome.trim(),
       parseInt(cfu, 10),
       tipo,
+      professore.trim() || undefined,
       tipo === 'tirocinio' && oreTarget ? parseInt(oreTarget, 10) : undefined
     );
-    setNome('');
-    setCfu('');
-    setTipo('voto');
-    setOreTarget('');
+    setNome(''); setProfessore(''); setCfu(''); setTipo('voto'); setOreTarget('');
     setDialogVisible(false);
     load();
   }
 
   function elimina(id: number) {
-    Alert.alert('Elimina esame', 'Sei sicuro? Verranno eliminati anche sessioni e moduli.', [
+    Alert.alert('Elimina esame', 'Verranno eliminati anche sessioni e moduli.', [
       { text: 'Annulla', style: 'cancel' },
-      {
-        text: 'Elimina',
-        style: 'destructive',
-        onPress: () => {
-          deleteEsame(id);
-          load();
-        },
-      },
+      { text: 'Elimina', style: 'destructive', onPress: () => { deleteEsame(id); load(); } },
     ]);
   }
 
@@ -91,6 +87,9 @@ export default function EsamiScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text variant="headlineMedium" style={styles.title}>Esami</Text>
+        <Text variant="bodySmall" style={styles.subtitle}>
+          {esami.filter((e) => e.superato).length}/{esami.length} superati
+        </Text>
       </View>
 
       <View style={styles.filterRow}>
@@ -103,7 +102,6 @@ export default function EsamiScreen() {
             { value: 'superati', label: 'Superati' },
           ]}
           style={styles.segmented}
-          theme={{ colors: { secondaryContainer: colors.primary + '33' } }}
         />
       </View>
 
@@ -111,106 +109,111 @@ export default function EsamiScreen() {
         {filtered.length === 0 && (
           <Text style={styles.empty}>
             {filtro === 'tutti'
-              ? 'Nessun esame. Aggiungine uno con il tasto + in basso.'
+              ? 'Nessun esame. Aggiungine uno con + in basso.'
               : 'Nessun esame in questa categoria.'}
           </Text>
         )}
 
-        {filtered.map((esame) => (
-          <Card
-            key={esame.id}
-            style={styles.card}
-            onPress={() => router.push(`/esame/${esame.id}`)}
-          >
-            <Card.Content style={styles.cardContent}>
-              <View style={styles.cardTop}>
-                <View style={{ flex: 1 }}>
-                  <Text variant="titleMedium" style={styles.esameNome} numberOfLines={1}>
-                    {esame.nome}
-                  </Text>
-                  <View style={styles.chipRow}>
-                    <Chip
-                      compact
-                      style={[
-                        styles.chip,
-                        { backgroundColor: colors.primary + '22' },
-                      ]}
-                      textStyle={{ color: colors.primary, fontSize: 11 }}
-                    >
-                      {esame.cfu} CFU
-                    </Chip>
-                    {esame.tipo === 'tirocinio' && (
-                      <Chip
-                        compact
-                        style={[styles.chip, { backgroundColor: colors.secondary + '22' }]}
-                        textStyle={{ color: colors.secondary, fontSize: 11 }}
-                      >
-                        Tirocinio
-                      </Chip>
+        {filtered.map((esame, index) => {
+          const accent = accentForIndex(index);
+          const ore = oreMap[esame.id] ?? 0;
+          return (
+            <View
+              key={esame.id}
+              style={[styles.card, { borderLeftColor: accent }]}
+            >
+              <View
+                style={styles.cardInner}
+                onTouchEnd={() => router.push(`/esame/${esame.id}`)}
+              >
+                {/* Nome + menu */}
+                <View style={styles.cardTop}>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="titleMedium" style={styles.esameNome} numberOfLines={1}>
+                      {esame.nome}
+                    </Text>
+                    {esame.professore ? (
+                      <Text variant="bodySmall" style={styles.professore} numberOfLines={1}>
+                        {esame.professore}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  <View style={styles.cardRight}>
+                    {esame.superato ? (
+                      <Text style={[styles.votoText, { color: accent }]}>
+                        {esame.voto_finale === 33 ? '30L' : String(esame.voto_finale ?? '✓')}
+                      </Text>
+                    ) : (
+                      <Text style={styles.votoMuted}>—</Text>
                     )}
+                    <Menu
+                      visible={menuEsameId === esame.id}
+                      onDismiss={() => setMenuEsameId(null)}
+                      anchor={
+                        <IconButton
+                          icon="dots-vertical"
+                          size={18}
+                          iconColor={colors.textMuted}
+                          onPress={() => setMenuEsameId(esame.id)}
+                        />
+                      }
+                    >
+                      <Menu.Item
+                        onPress={() => { setMenuEsameId(null); router.push(`/esame/${esame.id}`); }}
+                        title="Apri dettaglio"
+                        leadingIcon="open-in-app"
+                      />
+                      <Divider />
+                      <Menu.Item
+                        onPress={() => { setMenuEsameId(null); elimina(esame.id); }}
+                        title="Elimina"
+                        leadingIcon="trash-can-outline"
+                      />
+                    </Menu>
                   </View>
                 </View>
 
-                <View style={styles.cardRight}>
-                  {esame.superato ? (
-                    <Text style={styles.votoText}>
-                      {esame.voto_finale === 33 ? '30L' : esame.voto_finale ?? '✓'}
+                {/* Footer */}
+                <View style={styles.cardFooter}>
+                  <View style={[styles.tag, { backgroundColor: accent + '22' }]}>
+                    <Text style={[styles.tagText, { color: accent }]}>
+                      {String(esame.cfu)} CFU
                     </Text>
-                  ) : (
-                    <Text style={styles.votoMuted}>—</Text>
-                  )}
-                  <Menu
-                    visible={menuEsameId === esame.id}
-                    onDismiss={() => setMenuEsameId(null)}
-                    anchor={
-                      <IconButton
-                        icon="dots-vertical"
-                        size={18}
-                        iconColor={colors.textMuted}
-                        onPress={() => setMenuEsameId(esame.id)}
-                      />
-                    }
-                  >
-                    <Menu.Item
-                      onPress={() => {
-                        setMenuEsameId(null);
-                        router.push(`/esame/${esame.id}`);
-                      }}
-                      title="Apri dettaglio"
-                      leadingIcon="open-in-app"
-                    />
-                    <Menu.Item
-                      onPress={() => {
-                        setMenuEsameId(null);
-                        elimina(esame.id);
-                      }}
-                      title="Elimina"
-                      leadingIcon="trash-can-outline"
-                    />
-                  </Menu>
+                  </View>
+                  {esame.tipo === 'tirocinio' ? (
+                    <View style={[styles.tag, { backgroundColor: colors.secondary + '22' }]}>
+                      <Text style={[styles.tagText, { color: colors.secondary }]}>Tirocinio</Text>
+                    </View>
+                  ) : null}
+                  {ore > 0 ? (
+                    <Text style={styles.oreText}>{String(ore)}h studiate</Text>
+                  ) : null}
                 </View>
               </View>
-
-              <Text variant="bodySmall" style={styles.oreText}>
-                {oreMap[esame.id] ?? 0}h studiate
-              </Text>
-            </Card.Content>
-          </Card>
-        ))}
+            </View>
+          );
+        })}
       </ScrollView>
 
       <Portal>
-        <Dialog
-          visible={dialogVisible}
-          onDismiss={() => setDialogVisible(false)}
-          style={styles.dialog}
-        >
+        <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)} style={styles.dialog}>
           <Dialog.Title style={{ color: colors.textPrimary }}>Nuovo Esame</Dialog.Title>
           <Dialog.Content style={{ gap: 12 }}>
             <TextInput
               label="Nome esame"
               value={nome}
               onChangeText={setNome}
+              mode="outlined"
+              outlineColor={colors.border}
+              activeOutlineColor={colors.primary}
+              textColor={colors.textPrimary}
+              style={styles.input}
+            />
+            <TextInput
+              label="Professore (opzionale)"
+              value={professore}
+              onChangeText={setProfessore}
               mode="outlined"
               outlineColor={colors.border}
               activeOutlineColor={colors.primary}
@@ -236,7 +239,7 @@ export default function EsamiScreen() {
                 { value: 'tirocinio', label: 'Tirocinio' },
               ]}
             />
-            {tipo === 'tirocinio' && (
+            {tipo === 'tirocinio' ? (
               <TextInput
                 label="Ore target tirocinio"
                 value={oreTarget}
@@ -248,17 +251,13 @@ export default function EsamiScreen() {
                 textColor={colors.textPrimary}
                 style={styles.input}
               />
-            )}
+            ) : null}
           </Dialog.Content>
           <Dialog.Actions>
             <Button textColor={colors.textSecondary} onPress={() => setDialogVisible(false)}>
               Annulla
             </Button>
-            <Button
-              mode="contained"
-              onPress={salvaEsame}
-              disabled={!nome.trim() || !cfu.trim()}
-            >
+            <Button mode="contained" onPress={salvaEsame} disabled={!nome.trim() || !cfu.trim()}>
               Aggiungi
             </Button>
           </Dialog.Actions>
@@ -277,23 +276,31 @@ export default function EsamiScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
+  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 },
   title: { color: colors.textPrimary, fontWeight: '800' },
-  filterRow: { paddingHorizontal: 16, paddingBottom: 8 },
+  subtitle: { color: colors.textMuted, marginTop: 2 },
+  filterRow: { paddingHorizontal: 16, paddingBottom: 10 },
   segmented: { backgroundColor: colors.surface },
   scroll: { flex: 1 },
   content: { padding: 16, gap: 10, paddingBottom: 100 },
   empty: { color: colors.textMuted, textAlign: 'center', marginTop: 40 },
-  card: { backgroundColor: colors.card, borderRadius: 16 },
-  cardContent: { gap: 6 },
-  cardTop: { flexDirection: 'row', alignItems: 'flex-start' },
-  esameNome: { color: colors.textPrimary, fontWeight: '600', marginBottom: 6 },
-  chipRow: { flexDirection: 'row', gap: 6 },
-  chip: { height: 22 },
-  cardRight: { alignItems: 'flex-end' },
-  votoText: { fontSize: 22, fontWeight: '800', color: colors.success },
-  votoMuted: { fontSize: 22, fontWeight: '800', color: colors.textMuted },
-  oreText: { color: colors.textMuted },
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    borderLeftWidth: 4,
+    overflow: 'hidden',
+  },
+  cardInner: { padding: 14 },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
+  esameNome: { color: colors.textPrimary, fontWeight: '700', marginBottom: 2 },
+  professore: { color: colors.textSecondary },
+  cardRight: { alignItems: 'flex-end', marginLeft: 8 },
+  votoText: { fontSize: 24, fontWeight: '800', lineHeight: 28 },
+  votoMuted: { fontSize: 24, fontWeight: '800', color: colors.border, lineHeight: 28 },
+  cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  tagText: { fontSize: 11, fontWeight: '700' },
+  oreText: { color: colors.textMuted, fontSize: 12, marginLeft: 'auto' },
   dialog: { backgroundColor: colors.surface },
   input: { backgroundColor: colors.card },
   fab: {

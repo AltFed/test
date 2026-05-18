@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import type { Esame, Modulo, SessioneStudio, Lezione } from './types';
+import type { Esame, Modulo, SessioneStudio, Lezione, LezioneConEsame } from './types';
 
 let _db: SQLite.SQLiteDatabase | null = null;
 
@@ -47,18 +47,21 @@ export function initDatabase(): void {
 
     CREATE TABLE IF NOT EXISTS lezioni (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      nome TEXT NOT NULL,
-      professore TEXT,
+      esame_id INTEGER NOT NULL,
       giorno INTEGER NOT NULL,
       ora_inizio TEXT NOT NULL,
       ora_fine TEXT NOT NULL,
       aula TEXT NOT NULL,
-      colore TEXT NOT NULL DEFAULT '#7C4DFF'
+      colore TEXT NOT NULL DEFAULT '#7C4DFF',
+      FOREIGN KEY (esame_id) REFERENCES esami(id) ON DELETE CASCADE
     );
   `);
 
   // Migrazioni
   try { db().runSync('ALTER TABLE esami ADD COLUMN professore TEXT;'); } catch {}
+  try { db().runSync('ALTER TABLE lezioni ADD COLUMN esame_id INTEGER NOT NULL DEFAULT 0;'); } catch {}
+  try { db().runSync('ALTER TABLE lezioni DROP COLUMN nome;'); } catch {}
+  try { db().runSync('ALTER TABLE lezioni DROP COLUMN professore;'); } catch {}
 }
 
 // --- Impostazioni ---
@@ -168,15 +171,24 @@ export function getSessioniRecenti(esameId: number): SessioneStudio[] {
 
 // --- Lezioni ---
 
-export function getAllLezioni(): Lezione[] {
+export function getAllLezioniConEsame(): LezioneConEsame[] {
+  return db().getAllSync<LezioneConEsame>(`
+    SELECT l.*, e.nome AS nome_esame, e.professore
+    FROM lezioni l
+    JOIN esami e ON e.id = l.esame_id
+    ORDER BY l.giorno ASC, l.ora_inizio ASC
+  `);
+}
+
+export function getLezioniByEsame(esameId: number): Lezione[] {
   return db().getAllSync<Lezione>(
-    'SELECT * FROM lezioni ORDER BY giorno ASC, ora_inizio ASC'
+    'SELECT * FROM lezioni WHERE esame_id = ? ORDER BY giorno ASC, ora_inizio ASC',
+    esameId
   );
 }
 
 export function insertLezione(
-  nome: string,
-  professore: string | null,
+  esameId: number,
   giorno: number,
   ora_inizio: string,
   ora_fine: string,
@@ -184,8 +196,8 @@ export function insertLezione(
   colore: string
 ): void {
   db().runSync(
-    'INSERT INTO lezioni (nome, professore, giorno, ora_inizio, ora_fine, aula, colore) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    nome, professore, giorno, ora_inizio, ora_fine, aula, colore
+    'INSERT INTO lezioni (esame_id, giorno, ora_inizio, ora_fine, aula, colore) VALUES (?, ?, ?, ?, ?, ?)',
+    esameId, giorno, ora_inizio, ora_fine, aula, colore
   );
 }
 

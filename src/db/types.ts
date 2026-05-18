@@ -31,11 +31,15 @@ export interface SessioneStudio {
 
 export interface Lezione {
   id: number;
-  nome: string;
-  professore: string | null;
+  esame_id: number;
   giorno: number; // 0=Lunedì … 4=Venerdì
   ora_inizio: string; // "09:00"
   ora_fine: string;   // "11:00"
   aula: string;
   colore: string;     // hex
+}
+
+export interface LezioneConEsame extends Lezione {
+  nome_esame: string;
+  professore: string | null;
 }

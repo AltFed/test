@@ -1,17 +1,10 @@
 import { useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
-import {
-  Text,
-  Card,
-  Button,
-  TextInput,
-  ProgressBar,
-  IconButton,
-  Divider,
-} from 'react-native-paper';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text, Portal, Dialog, Button, TextInput } from 'react-native-paper';
 import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '@/theme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useColors, fonts } from '@/theme';
 import { getEsamiSuperati, getMediaPonderata } from '@/db/database';
 import type { Esame } from '@/db/types';
 
@@ -22,23 +15,16 @@ interface VotoIpotetico {
   voto: string;
 }
 
-function mediaConLode(voto: number): number {
-  return voto === 33 ? 30 : voto;
-}
+function mediaConLode(v: number): number { return v === 33 ? 30 : v; }
 
 function calcolaMedia(esami: Esame[], ipotesi: VotoIpotetico[]): number {
   const reali = esami
     .filter((e) => e.superato && e.tipo === 'voto' && e.voto_finale)
     .map((e) => ({ voto: e.voto_finale!, cfu: e.cfu }));
-
   const extra = ipotesi
     .filter((h) => h.voto && h.cfu)
-    .map((h) => ({
-      voto: mediaConLode(parseInt(h.voto, 10)),
-      cfu: parseInt(h.cfu, 10),
-    }))
+    .map((h) => ({ voto: mediaConLode(parseInt(h.voto, 10)), cfu: parseInt(h.cfu, 10) }))
     .filter((h) => !isNaN(h.voto) && !isNaN(h.cfu));
-
   const all = [...reali, ...extra];
   if (all.length === 0) return 0;
   const sumCfu = all.reduce((s, e) => s + e.cfu, 0);
@@ -46,26 +32,22 @@ function calcolaMedia(esami: Esame[], ipotesi: VotoIpotetico[]): number {
   return Math.round((sumPeso / sumCfu) * 100) / 100;
 }
 
-function votiNecessariPer(mediaTarget: number, esami: Esame[], cfu: number): number | null {
+function votoNecessarioPer(target: number, esami: Esame[], cfu: number): number | null {
   const reali = esami
     .filter((e) => e.superato && e.tipo === 'voto' && e.voto_finale)
     .map((e) => ({ voto: e.voto_finale!, cfu: e.cfu }));
   if (reali.length === 0) return null;
-  const sumCfuAttuali = reali.reduce((s, e) => s + e.cfu, 0);
-  const sumPesoAttuali = reali.reduce((s, e) => s + e.voto * e.cfu, 0);
-  // target = (sumPeso + X * cfu) / (sumCfu + cfu)
-  // X = (target * (sumCfu + cfu) - sumPeso) / cfu
-  const votoNecessario =
-    (mediaTarget * (sumCfuAttuali + cfu) - sumPesoAttuali) / cfu;
-  return Math.round(votoNecessario * 10) / 10;
+  const sumCfu = reali.reduce((s, e) => s + e.cfu, 0);
+  const sumPeso = reali.reduce((s, e) => s + e.voto * e.cfu, 0);
+  return Math.round(((target * (sumCfu + cfu) - sumPeso) / cfu) * 10) / 10;
 }
 
-// Conversione media → 110: formula standard
 function mediaA110(media: number): number {
   return Math.round((media / 30) * 110 * 10) / 10;
 }
 
 export default function SimulatoreScreen() {
+  const C = useColors();
   const [esamiSuperati, setEsamiSuperati] = useState<Esame[]>([]);
   const [mediaAttuale, setMediaAttuale] = useState(0);
   const [ipotesi, setIpotesi] = useState<VotoIpotetico[]>([]);
@@ -74,8 +56,7 @@ export default function SimulatoreScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const sup = getEsamiSuperati();
-      setEsamiSuperati(sup);
+      setEsamiSuperati(getEsamiSuperati());
       setMediaAttuale(getMediaPonderata());
     }, [])
   );
@@ -89,260 +70,243 @@ export default function SimulatoreScreen() {
   const cfuSim = parseInt(cfuSimStr, 10);
   const votoNecessario =
     targetMediaStr && !isNaN(targetMedia) && !isNaN(cfuSim)
-      ? votiNecessariPer(targetMedia, esamiSuperati, cfuSim)
+      ? votoNecessarioPer(targetMedia, esamiSuperati, cfuSim)
       : null;
 
   function aggiungiIpotesi() {
-    setIpotesi((prev) => [
-      ...prev,
-      { id: Date.now().toString(), nome: '', cfu: '6', voto: '' },
-    ]);
-  }
-
-  function rimuoviIpotesi(id: string) {
-    setIpotesi((prev) => prev.filter((h) => h.id !== id));
+    setIpotesi((prev) => [...prev, { id: Date.now().toString(), nome: '', cfu: '6', voto: '' }]);
   }
 
   function aggiornaIpotesi(id: string, field: keyof VotoIpotetico, val: string) {
-    setIpotesi((prev) =>
-      prev.map((h) => (h.id === id ? { ...h, [field]: val } : h))
-    );
+    setIpotesi((prev) => prev.map((h) => (h.id === id ? { ...h, [field]: val } : h)));
   }
 
-  const progressTarget = Math.min(mediaSimulata / 30, 1);
-
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text variant="headlineMedium" style={styles.title}>Simulatore</Text>
+    <SafeAreaView style={[s.safe, { backgroundColor: C.background }]} edges={['top']}>
+      <ScrollView contentContainerStyle={s.content}>
+        <Text style={[s.title, { color: C.textPrimary, fontFamily: fonts.dot }]}>Simulatore</Text>
 
         {/* Media attuale */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text style={styles.label}>MEDIA ATTUALE</Text>
-            <View style={styles.mediaRow}>
-              <View style={styles.mediaBlock}>
-                <Text style={styles.mediaNum}>
-                  {mediaAttuale > 0 ? mediaAttuale.toFixed(2) : '—'}
-                </Text>
-                <Text style={styles.muted}>/ 30 ponderata</Text>
-              </View>
-              <View style={[styles.mediaBlock, { alignItems: 'flex-end' }]}>
-                <Text style={[styles.mediaNum, { color: colors.secondary }]}>
-                  {mediaAttuale > 0 ? voto110Attuale : '—'}
-                </Text>
-                <Text style={styles.muted}>/ 110 stimato</Text>
-              </View>
-            </View>
-            <ProgressBar
-              progress={mediaAttuale > 0 ? progressTarget : 0}
-              color={colors.primary}
-              style={styles.bar}
-            />
-            <Text style={styles.muted}>
-              {esamiSuperati.filter((e) => e.tipo === 'voto').length} esami con voto registrati
-            </Text>
-          </Card.Content>
-        </Card>
-
-        {/* Simulazione sliding doors */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.row}>
-              <Text style={styles.label}>SLIDING DOORS</Text>
-              <Button
-                compact
-                mode="text"
-                onPress={aggiungiIpotesi}
-                textColor={colors.primary}
-                icon="plus"
-              >
-                Aggiungi voto
-              </Button>
-            </View>
-
-            {ipotesi.length === 0 && (
-              <Text style={styles.muted}>
-                Aggiungi voti ipotetici per vedere come cambia la tua media.
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <Text style={[s.label, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+            MEDIA ATTUALE
+          </Text>
+          <View style={s.mediaRow}>
+            <View style={s.mediaBlock}>
+              <Text style={[s.mediaBig, { color: C.accent, fontFamily: fonts.dot }]}>
+                {mediaAttuale > 0 ? mediaAttuale.toFixed(2) : '—'}
               </Text>
-            )}
+              <Text style={[s.mediaSub, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                / 30 ponderata
+              </Text>
+            </View>
+            <View style={[s.mediaDivider, { backgroundColor: C.border }]} />
+            <View style={[s.mediaBlock, { alignItems: 'flex-end' }]}>
+              <Text style={[s.mediaBig, { color: C.textSecondary, fontFamily: fonts.dot }]}>
+                {mediaAttuale > 0 ? String(voto110Attuale) : '—'}
+              </Text>
+              <Text style={[s.mediaSub, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                / 110 stimato
+              </Text>
+            </View>
+          </View>
+          <View style={[s.progressTrack, { backgroundColor: C.border }]}>
+            <View
+              style={[
+                s.progressFill,
+                { width: `${(mediaAttuale / 30) * 100}%` as any, backgroundColor: C.accent },
+              ]}
+            />
+          </View>
+          <Text style={[s.subtext, { color: C.textMuted, fontFamily: fonts.mono }]}>
+            {String(esamiSuperati.filter((e) => e.tipo === 'voto').length)} esami con voto
+          </Text>
+        </View>
 
-            {ipotesi.map((h) => (
-              <View key={h.id} style={styles.ipotesiRow}>
-                <TextInput
-                  placeholder="Materia"
-                  value={h.nome}
-                  onChangeText={(v) => aggiornaIpotesi(h.id, 'nome', v)}
-                  mode="outlined"
-                  style={[styles.input, { flex: 2 }]}
-                  outlineColor={colors.border}
-                  activeOutlineColor={colors.primary}
-                  textColor={colors.textPrimary}
-                  placeholderTextColor={colors.textMuted}
-                  dense
-                />
-                <TextInput
-                  placeholder="CFU"
-                  value={h.cfu}
-                  onChangeText={(v) => aggiornaIpotesi(h.id, 'cfu', v)}
-                  keyboardType="numeric"
-                  mode="outlined"
-                  style={[styles.input, { flex: 1 }]}
-                  outlineColor={colors.border}
-                  activeOutlineColor={colors.primary}
-                  textColor={colors.textPrimary}
-                  placeholderTextColor={colors.textMuted}
-                  dense
-                />
-                <TextInput
-                  placeholder="Voto"
-                  value={h.voto}
-                  onChangeText={(v) => aggiornaIpotesi(h.id, 'voto', v)}
-                  keyboardType="numeric"
-                  mode="outlined"
-                  style={[styles.input, { flex: 1 }]}
-                  outlineColor={colors.border}
-                  activeOutlineColor={colors.primary}
-                  textColor={colors.textPrimary}
-                  placeholderTextColor={colors.textMuted}
-                  dense
-                />
-                <IconButton
-                  icon="close"
-                  size={18}
-                  iconColor={colors.textMuted}
-                  onPress={() => rimuoviIpotesi(h.id)}
-                />
-              </View>
-            ))}
-
-            {ipotesi.length > 0 && (
-              <>
-                <Divider style={styles.divider} />
-                <View style={styles.deltaRow}>
-                  <View style={styles.deltaBlock}>
-                    <Text style={styles.label}>MEDIA SIMULATA</Text>
-                    <Text style={[styles.deltaNum, { color: colors.primary }]}>
-                      {mediaSimulata > 0 ? mediaSimulata.toFixed(2) : '—'}
-                    </Text>
-                  </View>
-                  <View style={styles.deltaBlock}>
-                    <Text style={styles.label}>DELTA</Text>
-                    <Text
-                      style={[
-                        styles.deltaNum,
-                        { color: deltaMedia >= 0 ? colors.success : colors.error },
-                      ]}
-                    >
-                      {deltaMedia >= 0 ? '+' : ''}{deltaMedia.toFixed(2)}
-                    </Text>
-                  </View>
-                  <View style={styles.deltaBlock}>
-                    <Text style={styles.label}>/ 110</Text>
-                    <Text style={[styles.deltaNum, { color: colors.secondary }]}>
-                      {mediaSimulata > 0 ? voto110Simulato : '—'}
-                    </Text>
-                  </View>
-                </View>
-              </>
-            )}
-          </Card.Content>
-        </Card>
-
-        {/* Calcolatore target */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text style={styles.label}>CALCOLATORE TARGET</Text>
-            <Text style={[styles.muted, { marginBottom: 12 }]}>
-              Che voto devo prendere per raggiungere la media desiderata?
+        {/* Sliding doors */}
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <View style={s.cardHeader}>
+            <Text style={[s.label, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+              SLIDING DOORS
             </Text>
-            <View style={styles.targetRow}>
+            <TouchableOpacity
+              style={[s.addBtn, { borderColor: C.accent }]}
+              onPress={aggiungiIpotesi}
+            >
+              <MaterialCommunityIcons name="plus" size={14} color={C.accent} />
+              <Text style={[s.addBtnText, { color: C.accent, fontFamily: fonts.mono }]}>
+                AGGIUNGI
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {ipotesi.length === 0 && (
+            <Text style={[s.subtext, { color: C.textMuted, fontFamily: fonts.mono }]}>
+              Aggiungi voti ipotetici per simulare la tua media futura.
+            </Text>
+          )}
+
+          {ipotesi.map((h) => (
+            <View key={h.id} style={s.ipotesiRow}>
               <TextInput
-                label="Media target"
-                value={targetMediaStr}
-                onChangeText={setTargetMediaStr}
-                keyboardType="decimal-pad"
+                placeholder="Materia"
+                value={h.nome}
+                onChangeText={(v) => aggiornaIpotesi(h.id, 'nome', v)}
                 mode="outlined"
-                style={[styles.input, { flex: 1 }]}
-                outlineColor={colors.border}
-                activeOutlineColor={colors.primary}
-                textColor={colors.textPrimary}
+                style={[s.input, { flex: 2, backgroundColor: C.surface }]}
+                outlineColor={C.border}
+                activeOutlineColor={C.accent}
+                textColor={C.textPrimary}
+                placeholderTextColor={C.textMuted}
+                dense
               />
               <TextInput
-                label="Su CFU"
-                value={cfuSimStr}
-                onChangeText={setCfuSimStr}
+                placeholder="CFU"
+                value={h.cfu}
+                onChangeText={(v) => aggiornaIpotesi(h.id, 'cfu', v)}
                 keyboardType="numeric"
                 mode="outlined"
-                style={[styles.input, { flex: 1 }]}
-                outlineColor={colors.border}
-                activeOutlineColor={colors.primary}
-                textColor={colors.textPrimary}
+                style={[s.input, { flex: 1, backgroundColor: C.surface }]}
+                outlineColor={C.border}
+                activeOutlineColor={C.accent}
+                textColor={C.textPrimary}
+                placeholderTextColor={C.textMuted}
+                dense
               />
+              <TextInput
+                placeholder="Voto"
+                value={h.voto}
+                onChangeText={(v) => aggiornaIpotesi(h.id, 'voto', v)}
+                keyboardType="numeric"
+                mode="outlined"
+                style={[s.input, { flex: 1, backgroundColor: C.surface }]}
+                outlineColor={C.border}
+                activeOutlineColor={C.accent}
+                textColor={C.textPrimary}
+                placeholderTextColor={C.textMuted}
+                dense
+              />
+              <TouchableOpacity
+                onPress={() => setIpotesi((p) => p.filter((x) => x.id !== h.id))}
+                style={s.removeBtn}
+              >
+                <MaterialCommunityIcons name="close" size={18} color={C.textMuted} />
+              </TouchableOpacity>
             </View>
+          ))}
 
-            {votoNecessario !== null && (
-              <View style={styles.risultatoBox}>
-                <Text style={styles.muted}>Voto necessario al prossimo esame ({cfuSim} CFU):</Text>
-                <Text
-                  style={[
-                    styles.risultatoNum,
-                    {
-                      color:
-                        votoNecessario <= 30
-                          ? colors.success
-                          : votoNecessario <= 33
-                          ? colors.warning
-                          : colors.error,
-                    },
-                  ]}
-                >
-                  {votoNecessario > 33
-                    ? 'Impossibile con questo esame'
-                    : votoNecessario <= 18
-                    ? '18 (minimo)'
-                    : `${votoNecessario > 30 ? '30 con lode' : votoNecessario}`}
-                </Text>
-              </View>
-            )}
-          </Card.Content>
-        </Card>
+          {ipotesi.length > 0 && (
+            <View style={[s.deltaBox, { borderTopColor: C.border }]}>
+              {[
+                { label: 'SIMULATA', value: mediaSimulata > 0 ? mediaSimulata.toFixed(2) : '—', color: C.accent },
+                {
+                  label: 'DELTA',
+                  value: `${deltaMedia >= 0 ? '+' : ''}${deltaMedia.toFixed(2)}`,
+                  color: deltaMedia >= 0 ? C.success : C.destructive,
+                },
+                { label: '/ 110', value: mediaSimulata > 0 ? String(voto110Simulato) : '—', color: C.textSecondary },
+              ].map((item) => (
+                <View key={item.label} style={s.deltaItem}>
+                  <Text style={[s.deltaLabel, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                    {item.label}
+                  </Text>
+                  <Text style={[s.deltaNum, { color: item.color, fontFamily: fonts.dot }]}>
+                    {item.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Target calculator */}
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <Text style={[s.label, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+            CALCOLATORE TARGET
+          </Text>
+          <Text style={[s.subtext, { color: C.textMuted, fontFamily: fonts.mono, marginBottom: 12 }]}>
+            Che voto devo prendere per raggiungere la media target?
+          </Text>
+          <View style={s.targetRow}>
+            <TextInput
+              label="Media target"
+              value={targetMediaStr}
+              onChangeText={setTargetMediaStr}
+              keyboardType="decimal-pad"
+              mode="outlined"
+              style={[s.input, { flex: 1, backgroundColor: C.surface }]}
+              outlineColor={C.border}
+              activeOutlineColor={C.accent}
+              textColor={C.textPrimary}
+            />
+            <TextInput
+              label="Su CFU"
+              value={cfuSimStr}
+              onChangeText={setCfuSimStr}
+              keyboardType="numeric"
+              mode="outlined"
+              style={[s.input, { flex: 1, backgroundColor: C.surface }]}
+              outlineColor={C.border}
+              activeOutlineColor={C.accent}
+              textColor={C.textPrimary}
+            />
+          </View>
+
+          {votoNecessario !== null && (
+            <View style={[s.risultatoBox, { backgroundColor: C.surface, borderColor: C.border }]}>
+              <Text style={[s.subtext, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                Voto necessario ({String(cfuSim)} CFU):
+              </Text>
+              <Text
+                style={[
+                  s.risultatoNum,
+                  {
+                    fontFamily: fonts.dot,
+                    color: votoNecessario <= 30 ? C.success : votoNecessario <= 33 ? C.warning : C.destructive,
+                  },
+                ]}
+              >
+                {votoNecessario > 33
+                  ? 'IMPOSSIBILE'
+                  : votoNecessario <= 18
+                  ? '18 MIN'
+                  : votoNecessario > 30
+                  ? '30 LODE'
+                  : String(votoNecessario)}
+              </Text>
+            </View>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const s = StyleSheet.create({
+  safe: { flex: 1 },
   content: { padding: 16, gap: 12, paddingBottom: 40 },
-  title: { color: colors.textPrimary, fontWeight: '800', marginBottom: 4 },
-  card: { backgroundColor: colors.card, borderRadius: 16 },
-  label: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-    marginBottom: 8,
-  },
-  mediaRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  mediaBlock: {},
-  mediaNum: { fontSize: 40, fontWeight: '800', color: colors.primary },
-  muted: { color: colors.textMuted, fontSize: 12 },
-  bar: { height: 8, borderRadius: 4, marginBottom: 8 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  title: { fontSize: 36, lineHeight: 38, marginBottom: 4 },
+  card: { borderRadius: 16, borderWidth: 1, padding: 16 },
+  label: { fontSize: 10, letterSpacing: 2, marginBottom: 10 },
+  mediaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 12 },
+  mediaBlock: { flex: 1 },
+  mediaBig: { fontSize: 44, lineHeight: 46 },
+  mediaSub: { fontSize: 12 },
+  mediaDivider: { width: 1, height: 50 },
+  progressTrack: { height: 2, borderRadius: 1, overflow: 'hidden', marginBottom: 8 },
+  progressFill: { height: '100%' },
+  subtext: { fontSize: 12, lineHeight: 18 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  addBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
+  addBtnText: { fontSize: 11, letterSpacing: 0.5 },
   ipotesiRow: { flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 8 },
-  input: { backgroundColor: colors.surface },
-  divider: { marginVertical: 12, backgroundColor: colors.border },
-  deltaRow: { flexDirection: 'row', justifyContent: 'space-around' },
-  deltaBlock: { alignItems: 'center' },
-  deltaNum: { fontSize: 28, fontWeight: '800' },
+  input: {},
+  removeBtn: { padding: 4 },
+  deltaBox: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 14, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth },
+  deltaItem: { alignItems: 'center', gap: 2 },
+  deltaLabel: { fontSize: 9, letterSpacing: 1.5 },
+  deltaNum: { fontSize: 32, lineHeight: 34 },
   targetRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-  risultatoBox: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    gap: 4,
-    alignItems: 'center',
-  },
-  risultatoNum: { fontSize: 24, fontWeight: '800' },
+  risultatoBox: { borderRadius: 12, borderWidth: 1, padding: 14, alignItems: 'center', gap: 4 },
+  risultatoNum: { fontSize: 36, lineHeight: 38 },
 });

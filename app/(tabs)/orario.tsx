@@ -1,15 +1,17 @@
 import { useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, Alert } from 'react-native';
-import { Text, IconButton } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text } from 'react-native-paper';
 import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '@/theme';
+import { useColors, fonts } from '@/theme';
+import { SwipeableRow } from '@/components/SwipeableRow';
 import { getAllLezioniConEsame, deleteLezione } from '@/db/database';
 import type { LezioneConEsame } from '@/db/types';
 
 const GIORNI = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
 export default function OrarioScreen() {
+  const C = useColors();
   const [lezioni, setLezioni] = useState<LezioneConEsame[]>([]);
 
   const load = useCallback(() => {
@@ -24,31 +26,26 @@ export default function OrarioScreen() {
     perGiorno[l.giorno].push(l);
   });
 
-  function elimina(id: number) {
-    Alert.alert('Elimina lezione', 'Rimuovere questa lezione dall\'orario?', [
-      { text: 'Annulla', style: 'cancel' },
-      { text: 'Elimina', style: 'destructive', onPress: () => { deleteLezione(id); load(); } },
-    ]);
-  }
-
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Text variant="headlineMedium" style={styles.title}>Orario Lezioni</Text>
-        <Text variant="bodySmall" style={styles.subtitle}>
+    <SafeAreaView style={[s.safe, { backgroundColor: C.background }]} edges={['top']}>
+      <View style={s.header}>
+        <Text style={[s.title, { color: C.textPrimary, fontFamily: fonts.dot }]}>Orario</Text>
+        <Text style={[s.subtitle, { color: C.textMuted, fontFamily: fonts.mono }]}>
           {lezioni.length > 0
-            ? `${String(lezioni.length)} lezioni — gestiscile dal dettaglio esame`
-            : 'Aggiungi lezioni dal dettaglio di ogni esame'}
+            ? `${String(lezioni.length)} lezioni — gestisci dal dettaglio esame`
+            : 'Aggiungi lezioni dal dettaglio esame'}
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={s.content}>
         {lezioni.length === 0 && (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyIcon}>📅</Text>
-            <Text style={styles.emptyTitle}>Nessuna lezione</Text>
-            <Text style={styles.emptyHint}>
-              Vai al dettaglio di un esame e aggiungi le lezioni dalla sezione Orario.
+          <View style={s.emptyBox}>
+            <Text style={[s.emptyNum, { color: C.accent, fontFamily: fonts.dot }]}>00</Text>
+            <Text style={[s.emptyTitle, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+              Nessuna lezione
+            </Text>
+            <Text style={[s.emptyHint, { color: C.textMuted, fontFamily: fonts.mono }]}>
+              Vai al dettaglio di un esame{'\n'}e aggiungi le lezioni dalla sezione Orario.
             </Text>
           </View>
         )}
@@ -57,37 +54,43 @@ export default function OrarioScreen() {
           const lez = perGiorno[idx];
           if (!lez || lez.length === 0) return null;
           return (
-            <View key={idx} style={styles.giornoSection}>
-              <Text style={styles.giornoLabel}>{nomeGiorno.toUpperCase()}</Text>
+            <View key={idx} style={s.giornoSection}>
+              <Text style={[s.giornoLabel, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+                {nomeGiorno.toUpperCase()}
+              </Text>
               {lez.map((l) => (
-                <View key={l.id} style={[styles.card, { borderLeftColor: l.colore }]}>
-                  <View style={styles.cardContent}>
-                    <View style={styles.orarioCol}>
-                      <Text style={[styles.ora, { color: l.colore }]}>{l.ora_inizio}</Text>
-                      <Text style={styles.oraSep}>↓</Text>
-                      <Text style={styles.oraFine}>{l.ora_fine}</Text>
+                <SwipeableRow
+                  key={l.id}
+                  onDelete={() => { deleteLezione(l.id); load(); }}
+                  bottomGap={8}
+                >
+                  <View style={[s.card, { backgroundColor: C.card, borderColor: C.border, borderLeftColor: l.colore }]}>
+                    <View style={s.orarioCol}>
+                      <Text style={[s.ora, { color: l.colore, fontFamily: fonts.dot }]}>
+                        {l.ora_inizio}
+                      </Text>
+                      <Text style={[s.oraSep, { color: C.textMuted, fontFamily: fonts.mono }]}>↓</Text>
+                      <Text style={[s.oraFine, { color: C.textSecondary, fontFamily: fonts.dot }]}>
+                        {l.ora_fine}
+                      </Text>
                     </View>
-                    <View style={styles.infoCol}>
-                      <Text variant="titleSmall" style={styles.nomeEsame} numberOfLines={1}>
+                    <View style={s.infoCol}>
+                      <Text style={[s.nomeEsame, { color: C.textPrimary, fontFamily: fonts.mono }]} numberOfLines={1}>
                         {l.nome_esame}
                       </Text>
                       {l.professore ? (
-                        <Text style={styles.professore} numberOfLines={1}>
+                        <Text style={[s.profText, { color: C.textSecondary, fontFamily: fonts.mono }]} numberOfLines={1}>
                           {l.professore}
                         </Text>
                       ) : null}
-                      <View style={[styles.aulaTag, { backgroundColor: l.colore + '22' }]}>
-                        <Text style={[styles.aulaText, { color: l.colore }]}>{l.aula}</Text>
+                      <View style={[s.aulaTag, { backgroundColor: l.colore + '22', borderColor: l.colore + '55' }]}>
+                        <Text style={[s.aulaText, { color: l.colore, fontFamily: fonts.mono }]}>
+                          {l.aula}
+                        </Text>
                       </View>
                     </View>
                   </View>
-                  <IconButton
-                    icon="trash-can-outline"
-                    size={18}
-                    iconColor={colors.textMuted}
-                    onPress={() => elimina(l.id)}
-                  />
-                </View>
+                </SwipeableRow>
               ))}
             </View>
           );
@@ -97,45 +100,41 @@ export default function OrarioScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const s = StyleSheet.create({
+  safe: { flex: 1 },
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
-  title: { color: colors.textPrimary, fontWeight: '800' },
-  subtitle: { color: colors.textMuted, marginTop: 2 },
-  content: { padding: 16, paddingBottom: 40 },
+  title: { fontSize: 36, lineHeight: 38 },
+  subtitle: { fontSize: 12, marginTop: 2 },
+  content: { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 8 },
   emptyBox: { alignItems: 'center', paddingTop: 60, gap: 10 },
-  emptyIcon: { fontSize: 48 },
-  emptyTitle: { color: colors.textSecondary, fontSize: 16, fontWeight: '700' },
-  emptyHint: { color: colors.textMuted, textAlign: 'center', paddingHorizontal: 32, lineHeight: 20 },
+  emptyNum: { fontSize: 64, lineHeight: 64 },
+  emptyTitle: { fontSize: 15, fontWeight: '700' },
+  emptyHint: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
   giornoSection: { marginBottom: 24 },
-  giornoLabel: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-    marginBottom: 8,
-  },
+  giornoLabel: { fontSize: 10, letterSpacing: 2, marginBottom: 8 },
   card: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    borderLeftWidth: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderLeftWidth: 3,
     marginBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 12,
+    gap: 14,
   },
-  cardContent: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 12, gap: 14 },
   orarioCol: { alignItems: 'center', minWidth: 52 },
-  ora: { fontSize: 15, fontWeight: '800' },
-  oraSep: { color: colors.textMuted, fontSize: 10, lineHeight: 14 },
-  oraFine: { color: colors.textSecondary, fontSize: 13 },
+  ora: { fontSize: 20, lineHeight: 22 },
+  oraSep: { fontSize: 10 },
+  oraFine: { fontSize: 16, lineHeight: 18 },
   infoCol: { flex: 1, gap: 3 },
-  nomeEsame: { color: colors.textPrimary, fontWeight: '700' },
-  professore: { color: colors.textSecondary, fontSize: 12 },
+  nomeEsame: { fontSize: 14, fontWeight: '600' },
+  profText: { fontSize: 11 },
   aulaTag: {
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
+    borderWidth: StyleSheet.hairlineWidth,
     marginTop: 2,
   },
   aulaText: { fontSize: 11, fontWeight: '700' },

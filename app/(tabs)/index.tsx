@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
-import { Text, Card, ProgressBar, IconButton, Surface } from 'react-native-paper';
+import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { Text } from 'react-native-paper';
 import { useFocusEffect, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '@/theme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useColors, fonts } from '@/theme';
 import { getSetting, getAllEsami, getMediaPonderata, getCfuAcquisiti } from '@/db/database';
 import type { Esame } from '@/db/types';
 
@@ -12,6 +13,7 @@ function daysUntil(iso: string): number {
 }
 
 export default function Dashboard() {
+  const C = useColors();
   const [dataLaurea, setDataLaurea] = useState<string | null>(null);
   const [cfuTotali, setCfuTotali] = useState(180);
   const [cfuAcquisiti, setCfuAcquisiti] = useState(0);
@@ -34,158 +36,143 @@ export default function Dashboard() {
   const superati = esami.filter((e) => e.superato);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text variant="headlineLarge" style={styles.title}>UniVersal</Text>
-          <IconButton
-            icon="cog-outline"
-            iconColor={colors.textSecondary}
-            size={22}
-            onPress={() => router.push('/impostazioni')}
-          />
+    <SafeAreaView style={[s.safe, { backgroundColor: C.background }]} edges={['top']}>
+      <ScrollView style={s.scroll} contentContainerStyle={s.content}>
+
+        {/* Header */}
+        <View style={s.header}>
+          <Text style={[s.appTitle, { color: C.textPrimary, fontFamily: fonts.dot }]}>
+            UniVersal
+          </Text>
+          <TouchableOpacity onPress={() => router.push('/impostazioni')} style={s.settingsBtn}>
+            <MaterialCommunityIcons name="cog-outline" size={22} color={C.textSecondary} />
+          </TouchableOpacity>
         </View>
 
-        {/* Countdown */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text style={styles.label}>TARGET LAUREA</Text>
-            {giorni !== null ? (
-              <View style={styles.countdownRow}>
-                <Text style={styles.countdownNum}>{giorni}</Text>
-                <Text variant="bodyLarge" style={styles.countdownSuffix}>
-                  {giorni === 1 ? 'giorno' : 'giorni'} alla sessione
-                </Text>
-              </View>
-            ) : (
-              <Text variant="bodyMedium" style={styles.muted}>
-                Imposta la data laurea nelle impostazioni →
+        {/* Countdown card */}
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <Text style={[s.label, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+            TARGET LAUREA
+          </Text>
+          {giorni !== null ? (
+            <View style={s.countdownRow}>
+              <Text style={[s.countdownNum, { color: C.accent, fontFamily: fonts.dot }]}>
+                {String(giorni)}
               </Text>
-            )}
-          </Card.Content>
-        </Card>
-
-        {/* CFU */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.row}>
-              <Text style={styles.label}>CFU ACQUISITI</Text>
-              <Text style={{ color: colors.primary, fontWeight: '700' }}>
-                {cfuAcquisiti} / {cfuTotali}
+              <Text style={[s.countdownSuffix, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+                {giorni === 1 ? 'giorno' : 'giorni'}{'\n'}alla sessione
               </Text>
             </View>
-            <ProgressBar
-              progress={cfuProgress}
-              color={colors.primary}
-              style={styles.bar}
-            />
-            <Text variant="bodySmall" style={styles.muted}>
-              {cfuTotali - cfuAcquisiti} CFU rimanenti ({Math.round(cfuProgress * 100)}%)
-            </Text>
-          </Card.Content>
-        </Card>
+          ) : (
+            <TouchableOpacity onPress={() => router.push('/impostazioni')}>
+              <Text style={[s.tapHint, { color: C.accent, fontFamily: fonts.mono }]}>
+                Imposta data → impostazioni
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-        {/* Stats */}
-        <View style={styles.statsRow}>
-          <Surface style={styles.stat} elevation={0}>
-            <Text style={styles.label}>MEDIA</Text>
-            <Text style={[styles.statNum, { color: colors.secondary }]}>
-              {media > 0 ? media.toFixed(2) : '—'}
+        {/* CFU progress */}
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <View style={s.row}>
+            <Text style={[s.label, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+              CFU ACQUISITI
             </Text>
-          </Surface>
-          <Surface style={styles.stat} elevation={0}>
-            <Text style={styles.label}>SUPERATI</Text>
-            <Text style={[styles.statNum, { color: colors.success }]}>
-              {superati.length}
+            <Text style={[s.cfuCount, { color: C.accent, fontFamily: fonts.dot }]}>
+              {String(cfuAcquisiti)} / {String(cfuTotali)}
             </Text>
-          </Surface>
-          <Surface style={styles.stat} elevation={0}>
-            <Text style={styles.label}>IN SOSPESO</Text>
-            <Text style={[styles.statNum, { color: colors.warning }]}>
-              {daSuperare.length}
-            </Text>
-          </Surface>
+          </View>
+          <View style={[s.progressTrack, { backgroundColor: C.border }]}>
+            <View
+              style={[s.progressFill, { width: `${cfuProgress * 100}%` as any, backgroundColor: C.accent }]}
+            />
+          </View>
+          <Text style={[s.subtext, { color: C.textMuted, fontFamily: fonts.mono }]}>
+            {String(cfuTotali - cfuAcquisiti)} CFU rimanenti · {String(Math.round(cfuProgress * 100))}%
+          </Text>
+        </View>
+
+        {/* Stats row */}
+        <View style={s.statsRow}>
+          {[
+            { label: 'MEDIA', value: media > 0 ? media.toFixed(2) : '—', color: C.accent },
+            { label: 'SUPERATI', value: String(superati.length), color: C.success },
+            { label: 'IN SOSPESO', value: String(daSuperare.length), color: C.warning },
+          ].map((stat) => (
+            <View key={stat.label} style={[s.statCard, { backgroundColor: C.card, borderColor: C.border }]}>
+              <Text style={[s.statLabel, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                {stat.label}
+              </Text>
+              <Text style={[s.statNum, { color: stat.color, fontFamily: fonts.dot }]}>
+                {stat.value}
+              </Text>
+            </View>
+          ))}
         </View>
 
         {/* Radar operativo */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text style={styles.label}>RADAR OPERATIVO</Text>
-            {daSuperare.length === 0 ? (
-              <Text variant="bodyMedium" style={styles.muted}>
-                Nessun esame in sospeso. Ottimo.
-              </Text>
-            ) : (
-              daSuperare.slice(0, 6).map((esame) => (
-                <View key={esame.id} style={styles.radarRow}>
-                  <View style={styles.dot} />
-                  <Text
-                    variant="bodyMedium"
-                    style={styles.radarNome}
-                    numberOfLines={1}
-                  >
-                    {esame.nome}
-                  </Text>
-                  <Text variant="bodySmall" style={styles.muted}>
-                    {esame.cfu} CFU
-                  </Text>
-                </View>
-              ))
-            )}
-          </Card.Content>
-        </Card>
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <Text style={[s.label, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+            RADAR OPERATIVO
+          </Text>
+          {daSuperare.length === 0 ? (
+            <Text style={[s.subtext, { color: C.textMuted, fontFamily: fonts.mono }]}>
+              Nessun esame in sospeso. Ottimo.
+            </Text>
+          ) : (
+            daSuperare.slice(0, 6).map((esame) => (
+              <TouchableOpacity
+                key={esame.id}
+                style={[s.radarRow, { borderBottomColor: C.border }]}
+                onPress={() => router.push(`/esame/${esame.id}`)}
+              >
+                <View style={[s.radarDot, { backgroundColor: C.accent }]} />
+                <Text style={[s.radarNome, { color: C.textPrimary, fontFamily: fonts.mono }]} numberOfLines={1}>
+                  {esame.nome}
+                </Text>
+                <Text style={[s.radarCfu, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                  {String(esame.cfu)} CFU
+                </Text>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const s = StyleSheet.create({
+  safe: { flex: 1 },
   scroll: { flex: 1 },
   content: { padding: 16, gap: 12, paddingBottom: 32 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  title: { color: colors.textPrimary, fontWeight: '800', letterSpacing: -0.5 },
-  card: { backgroundColor: colors.card, borderRadius: 16 },
-  label: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-    marginBottom: 8,
-  },
-  countdownRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
-  countdownNum: {
-    fontSize: 72,
-    fontWeight: '800',
-    color: colors.primary,
-    lineHeight: 80,
-  },
-  countdownSuffix: { color: colors.textSecondary },
-  muted: { color: colors.textMuted },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  bar: { marginVertical: 10, height: 8, borderRadius: 4 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  appTitle: { fontSize: 34, letterSpacing: 1 },
+  settingsBtn: { padding: 4 },
+  card: { borderRadius: 16, borderWidth: 1, padding: 16 },
+  label: { fontSize: 10, letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' },
+  countdownRow: { flexDirection: 'row', alignItems: 'baseline', gap: 12 },
+  countdownNum: { fontSize: 88, lineHeight: 88 },
+  countdownSuffix: { fontSize: 14, lineHeight: 20 },
+  tapHint: { fontSize: 13, textDecorationLine: 'underline' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  cfuCount: { fontSize: 22, lineHeight: 24 },
+  progressTrack: { height: 3, borderRadius: 2, overflow: 'hidden', marginBottom: 8 },
+  progressFill: { height: '100%', borderRadius: 2 },
+  subtext: { fontSize: 12 },
   statsRow: { flexDirection: 'row', gap: 8 },
-  stat: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 14,
-    alignItems: 'center',
-  },
-  statNum: { fontSize: 28, fontWeight: '800', marginTop: 4 },
+  statCard: { flex: 1, borderRadius: 16, borderWidth: 1, padding: 14, alignItems: 'center', gap: 4 },
+  statLabel: { fontSize: 9, letterSpacing: 1.5 },
+  statNum: { fontSize: 40, lineHeight: 44 },
   radarRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.warning },
-  radarNome: { flex: 1, color: colors.textPrimary },
+  radarDot: { width: 6, height: 6, borderRadius: 3 },
+  radarNome: { flex: 1, fontSize: 13 },
+  radarCfu: { fontSize: 12 },
 });

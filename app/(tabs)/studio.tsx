@@ -1,15 +1,15 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, Card, Button, ProgressBar, Menu, Divider } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Text, Portal, Dialog, Button, Menu } from 'react-native-paper';
 import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '@/theme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useColors, fonts } from '@/theme';
 import {
   getAllEsami,
   insertSessione,
   getOreStudiate,
   getSessioniRecenti,
-  getMediaPonderata,
 } from '@/db/database';
 import type { Esame, SessioneStudio } from '@/db/types';
 
@@ -26,14 +26,12 @@ function formatTime(s: number): string {
 
 function formatData(iso: string): string {
   return new Date(iso).toLocaleDateString('it-IT', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
   });
 }
 
 export default function StudioScreen() {
+  const C = useColors();
   const [esami, setEsami] = useState<Esame[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
@@ -53,7 +51,7 @@ export default function StudioScreen() {
     useCallback(() => {
       const list = getAllEsami();
       setEsami(list);
-      if (selectedId !== null) refreshStats(selectedId);
+      if (selectedId !== null) refreshStats(selectedId, list);
       return () => {
         if (intervalRef.current) clearInterval(intervalRef.current);
         setRunning(false);
@@ -61,11 +59,12 @@ export default function StudioScreen() {
     }, [selectedId])
   );
 
-  function refreshStats(id: number) {
+  function refreshStats(id: number, list?: Esame[]) {
     const ore = getOreStudiate(id);
     setOreTotali(ore);
     setSessioniRecenti(getSessioniRecenti(id));
-    const esame = esami.find((e) => e.id === id);
+    const src = list ?? esami;
+    const esame = src.find((e) => e.id === id);
     if (esame?.superato && esame.voto_finale) {
       setRoi({ ore, orePerCfu: Math.round((ore / esame.cfu) * 10) / 10 });
     } else {
@@ -110,10 +109,8 @@ export default function StudioScreen() {
         if (intervalRef.current) clearInterval(intervalRef.current);
         setRunning(false);
         if (fase === 'lavoro') {
-          // Salva sessione
           if (selectedId) {
-            const minutiLavorati = Math.round((POMODORO_LAVORO - Math.max(rimanenti, 0)) / 60);
-            insertSessione(selectedId, minutiLavorati || 25);
+            insertSessione(selectedId, 25);
             setSessioni((s) => s + 1);
             refreshStats(selectedId);
           }
@@ -129,201 +126,230 @@ export default function StudioScreen() {
         setSecondi(rimanenti);
       }
     }, 500);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [running, fase, selectedId]);
 
   const esameSelezionato = esami.find((e) => e.id === selectedId);
   const durata = fase === 'lavoro' ? POMODORO_LAVORO : POMODORO_PAUSA;
   const progress = 1 - secondi / durata;
-  const progressColor = fase === 'lavoro' ? colors.primary : colors.success;
+  const faseColor = fase === 'lavoro' ? C.accent : C.success;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text variant="headlineMedium" style={styles.title}>PT dello Studio</Text>
+    <SafeAreaView style={[s.safe, { backgroundColor: C.background }]} edges={['top']}>
+      <ScrollView contentContainerStyle={s.content}>
+        <Text style={[s.title, { color: C.textPrimary, fontFamily: fonts.dot }]}>Studio</Text>
 
-        {/* Selezione esame */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <Text style={styles.label}>ESAME IN ALLENAMENTO</Text>
-            <Menu
-              visible={menuVisible}
-              onDismiss={() => setMenuVisible(false)}
-              anchor={
-                <Button
-                  mode="outlined"
-                  onPress={() => !running && setMenuVisible(true)}
-                  textColor={esameSelezionato ? colors.textPrimary : colors.textMuted}
-                  style={styles.selectorBtn}
-                  contentStyle={styles.selectorContent}
-                  icon="chevron-down"
-                >
+        {/* Exam selector */}
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <Text style={[s.label, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+            ESAME IN ALLENAMENTO
+          </Text>
+          <Menu
+            visible={menuVisible}
+            onDismiss={() => setMenuVisible(false)}
+            anchor={
+              <TouchableOpacity
+                style={[s.selectorBtn, { borderColor: C.border }]}
+                onPress={() => !running && setMenuVisible(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={[s.selectorText, { color: esameSelezionato ? C.textPrimary : C.textMuted, fontFamily: fonts.mono }]} numberOfLines={1}>
                   {esameSelezionato ? esameSelezionato.nome : 'Seleziona esame...'}
-                </Button>
-              }
-            >
-              {esami
-                .filter((e) => !e.superato)
-                .map((e) => (
-                  <Menu.Item key={e.id} onPress={() => seleziona(e.id)} title={e.nome} />
-                ))}
-              {esami.filter((e) => !e.superato).length === 0 && (
-                <Menu.Item title="Nessun esame da studiare" disabled />
-              )}
-            </Menu>
-          </Card.Content>
-        </Card>
+                </Text>
+                <MaterialCommunityIcons name="chevron-down" size={18} color={C.textMuted} />
+              </TouchableOpacity>
+            }
+          >
+            {esami.filter((e) => !e.superato).map((e) => (
+              <Menu.Item key={e.id} onPress={() => seleziona(e.id)} title={e.nome} />
+            ))}
+            {esami.filter((e) => !e.superato).length === 0 && (
+              <Menu.Item title="Nessun esame da studiare" disabled />
+            )}
+          </Menu>
+        </View>
 
         {/* Timer */}
-        <Card style={styles.card}>
-          <Card.Content style={styles.timerContent}>
-            <Text style={[styles.label, { textAlign: 'center' }]}>
-              {fase === 'lavoro' ? '🎯 SESSIONE FOCUS' : '☕ PAUSA'}
-            </Text>
-            <Text style={styles.timerNum}>{formatTime(secondi)}</Text>
-            <ProgressBar
-              progress={progress}
-              color={progressColor}
-              style={styles.timerBar}
-            />
-            <View style={styles.timerBtns}>
-              <Button
-                mode="contained"
-                onPress={startStop}
-                disabled={!selectedId}
-                style={[styles.timerBtn, { backgroundColor: running ? colors.warning : colors.primary }]}
-                labelStyle={{ fontSize: 16, fontWeight: '700' }}
-              >
-                {running ? 'PAUSA' : 'INIZIA'}
-              </Button>
-              {!running && (
-                <Button
-                  mode="outlined"
-                  onPress={resetTimer}
-                  style={styles.resetBtn}
-                  textColor={colors.textSecondary}
-                >
-                  Reset
-                </Button>
-              )}
-            </View>
-            <Text style={styles.sessioniCount}>
-              Sessioni completate oggi: <Text style={{ color: colors.primary, fontWeight: '700' }}>{sessioni}</Text>
-            </Text>
-          </Card.Content>
-        </Card>
+        <View style={[s.card, s.timerCard, { backgroundColor: C.card, borderColor: C.border }]}>
+          <Text style={[s.faseLabel, { color: C.textMuted, fontFamily: fonts.mono }]}>
+            {fase === 'lavoro' ? 'SESSIONE FOCUS' : 'PAUSA'}
+          </Text>
 
-        {/* ROI */}
+          <Text style={[s.timerNum, { color: faseColor, fontFamily: fonts.dot }]}>
+            {formatTime(secondi)}
+          </Text>
+
+          {/* Progress track */}
+          <View style={[s.progressTrack, { backgroundColor: C.border }]}>
+            <View style={[s.progressFill, { width: `${progress * 100}%` as any, backgroundColor: faseColor }]} />
+          </View>
+
+          {/* Buttons */}
+          <View style={s.timerBtns}>
+            <TouchableOpacity
+              style={[
+                s.playBtn,
+                { backgroundColor: selectedId ? faseColor : C.border },
+              ]}
+              onPress={startStop}
+              disabled={!selectedId}
+              activeOpacity={0.85}
+            >
+              <MaterialCommunityIcons
+                name={running ? 'pause' : 'play'}
+                size={28}
+                color={selectedId ? '#000000' : C.textMuted}
+              />
+            </TouchableOpacity>
+            {!running && (
+              <TouchableOpacity
+                style={[s.resetBtn, { borderColor: C.border }]}
+                onPress={resetTimer}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons name="refresh" size={22} color={C.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <Text style={[s.sessioniCount, { color: C.textMuted, fontFamily: fonts.mono }]}>
+            Sessioni oggi:{' '}
+            <Text style={[s.sessioniCount, { color: faseColor, fontFamily: fonts.dot }]}>
+              {String(sessioni)}
+            </Text>
+          </Text>
+        </View>
+
+        {/* Study ROI */}
         {selectedId !== null && (
-          <Card style={styles.card}>
-            <Card.Content>
-              <Text style={styles.label}>STUDY ROI</Text>
-              <View style={styles.roiRow}>
-                <View style={styles.roiItem}>
-                  <Text style={styles.roiNum}>{oreTotali}h</Text>
-                  <Text style={styles.muted}>ore investite</Text>
-                </View>
-                {roi && (
-                  <>
-                    <Divider style={styles.divider} />
-                    <View style={styles.roiItem}>
-                      <Text style={[styles.roiNum, { color: colors.success }]}>
-                        {roi.orePerCfu}h
-                      </Text>
-                      <Text style={styles.muted}>per CFU</Text>
-                    </View>
-                    <Divider style={styles.divider} />
-                    <View style={styles.roiItem}>
-                      <Text style={[styles.roiNum, { color: colors.secondary }]}>
-                        {esameSelezionato?.voto_finale === 33
-                          ? '30L'
-                          : esameSelezionato?.voto_finale}
-                      </Text>
-                      <Text style={styles.muted}>voto finale</Text>
-                    </View>
-                  </>
-                )}
+          <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+            <Text style={[s.label, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+              STUDY ROI
+            </Text>
+            <View style={s.roiRow}>
+              <View style={s.roiItem}>
+                <Text style={[s.roiNum, { color: C.accent, fontFamily: fonts.dot }]}>
+                  {String(oreTotali)}h
+                </Text>
+                <Text style={[s.roiSub, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                  investite
+                </Text>
               </View>
-              {!roi && oreTotali > 0 && (
-                <Text style={styles.muted}>
-                  Registra il voto finale per sbloccare le statistiche di efficienza.
+              {roi ? (
+                <>
+                  <View style={[s.roiDivider, { backgroundColor: C.border }]} />
+                  <View style={s.roiItem}>
+                    <Text style={[s.roiNum, { color: C.success, fontFamily: fonts.dot }]}>
+                      {String(roi.orePerCfu)}h
+                    </Text>
+                    <Text style={[s.roiSub, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                      per CFU
+                    </Text>
+                  </View>
+                  <View style={[s.roiDivider, { backgroundColor: C.border }]} />
+                  <View style={s.roiItem}>
+                    <Text style={[s.roiNum, { color: C.warning, fontFamily: fonts.dot }]}>
+                      {esameSelezionato?.voto_finale === 33 ? '30L' : String(esameSelezionato?.voto_finale ?? '—')}
+                    </Text>
+                    <Text style={[s.roiSub, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                      voto
+                    </Text>
+                  </View>
+                </>
+              ) : oreTotali === 0 ? (
+                <Text style={[s.roiHint, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                  Nessuna sessione registrata.
+                </Text>
+              ) : (
+                <Text style={[s.roiHint, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                  Registra il voto per sbloccare le statistiche.
                 </Text>
               )}
-              {oreTotali === 0 && (
-                <Text style={styles.muted}>Nessuna sessione registrata per questo esame.</Text>
-              )}
-            </Card.Content>
-          </Card>
+            </View>
+          </View>
         )}
 
         {/* Sessioni recenti */}
         {sessioniRecenti.length > 0 && (
-          <Card style={styles.card}>
-            <Card.Content>
-              <Text style={styles.label}>SESSIONI RECENTI</Text>
-              {sessioniRecenti.map((s) => (
-                <View key={s.id} style={styles.sessioneRow}>
-                  <Text variant="bodyMedium" style={{ color: colors.textPrimary }}>
-                    {s.durata_minuti} min
-                  </Text>
-                  <Text variant="bodySmall" style={styles.muted}>
-                    {formatData(s.data)}
-                  </Text>
-                </View>
-              ))}
-            </Card.Content>
-          </Card>
+          <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+            <Text style={[s.label, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+              SESSIONI RECENTI
+            </Text>
+            {sessioniRecenti.map((sess, i) => (
+              <View
+                key={sess.id}
+                style={[
+                  s.sessioneRow,
+                  { borderBottomColor: C.border },
+                  i === sessioniRecenti.length - 1 && { borderBottomWidth: 0 },
+                ]}
+              >
+                <Text style={[s.sessioneMin, { color: C.textPrimary, fontFamily: fonts.dot }]}>
+                  {String(sess.durata_minuti)}m
+                </Text>
+                <Text style={[s.sessioneData, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                  {formatData(sess.data)}
+                </Text>
+              </View>
+            ))}
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const s = StyleSheet.create({
+  safe: { flex: 1 },
   content: { padding: 16, gap: 12, paddingBottom: 40 },
-  title: { color: colors.textPrimary, fontWeight: '800', marginBottom: 4 },
-  card: { backgroundColor: colors.card, borderRadius: 16 },
-  label: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-    marginBottom: 10,
-  },
+  title: { fontSize: 36, lineHeight: 38, marginBottom: 4 },
+  card: { borderRadius: 16, borderWidth: 1, padding: 16 },
+  timerCard: { alignItems: 'center', gap: 14 },
+  label: { fontSize: 10, letterSpacing: 2, marginBottom: 10 },
   selectorBtn: {
-    borderColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
     borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
   },
-  selectorContent: { flexDirection: 'row-reverse' },
-  timerContent: { alignItems: 'center', gap: 12 },
-  timerNum: {
-    fontSize: 72,
-    fontWeight: '800',
-    color: colors.textPrimary,
-    fontVariant: ['tabular-nums'],
-    letterSpacing: 2,
+  selectorText: { fontSize: 14, flex: 1 },
+  faseLabel: { fontSize: 11, letterSpacing: 2 },
+  timerNum: { fontSize: 88, lineHeight: 88 },
+  progressTrack: { width: '100%', height: 2, borderRadius: 1, overflow: 'hidden' },
+  progressFill: { height: '100%' },
+  timerBtns: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  playBtn: {
+    width: 68,
+    height: 68,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  timerBar: { width: '100%', height: 6, borderRadius: 3 },
-  timerBtns: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  timerBtn: { borderRadius: 12, minWidth: 140 },
   resetBtn: {
-    borderColor: colors.border,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sessioniCount: { color: colors.textMuted, fontSize: 13 },
-  roiRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  roiItem: { flex: 1, alignItems: 'center' },
-  roiNum: { fontSize: 28, fontWeight: '800', color: colors.primary },
-  divider: { width: 1, height: 40, backgroundColor: colors.border },
-  muted: { color: colors.textMuted, fontSize: 12 },
+  sessioniCount: { fontSize: 13 },
+  roiRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  roiItem: { flex: 1, alignItems: 'center', gap: 2 },
+  roiNum: { fontSize: 36, lineHeight: 38 },
+  roiSub: { fontSize: 11, letterSpacing: 0.5 },
+  roiDivider: { width: 1, height: 44 },
+  roiHint: { flex: 1, fontSize: 12, lineHeight: 18 },
   sessioneRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  sessioneMin: { fontSize: 24, lineHeight: 26 },
+  sessioneData: { fontSize: 12 },
 });

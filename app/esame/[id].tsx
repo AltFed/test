@@ -1,21 +1,17 @@
-import { useState, useCallback, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Alert } from 'react-native';
+import { useState, useCallback } from 'react';
+import { View, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import {
   Text,
-  Card,
-  Checkbox,
-  Button,
   Portal,
   Dialog,
+  Button,
   TextInput,
-  FAB,
-  SegmentedButtons,
-  Chip,
-  IconButton,
 } from 'react-native-paper';
 import { useLocalSearchParams, useFocusEffect, router, useNavigation } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '@/theme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useColors, fonts } from '@/theme';
+import { SwipeableRow } from '@/components/SwipeableRow';
 import {
   getEsame,
   getModuli,
@@ -33,38 +29,36 @@ import type { Esame, Modulo, Lezione } from '@/db/types';
 const GIORNI = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
 
 const PALETTE = [
-  '#7C4DFF', '#00BCD4', '#FF9800', '#4CAF50',
-  '#FF6B9D', '#C084FC', '#F44336', '#2196F3',
+  '#FFE600', '#30D158', '#0A84FF', '#FF9F0A',
+  '#FF453A', '#BF5AF2', '#FF6B9D', '#00C7BE',
 ];
 
+const tipoColor: Record<string, string> = {
+  scritto: '#0A84FF', orale: '#30D158', progetto: '#FF9F0A', ore: '#BF5AF2',
+};
 const tipoLabel: Record<string, string> = {
   scritto: 'Scritto', orale: 'Orale', progetto: 'Progetto', ore: 'Ore',
-};
-const tipoColor: Record<string, string> = {
-  scritto: colors.primary, orale: colors.secondary, progetto: colors.warning, ore: colors.success,
 };
 
 export default function EsameDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const esameId = parseInt(id, 10);
   const navigation = useNavigation();
+  const C = useColors();
 
   const [esame, setEsame] = useState<Esame | null>(null);
   const [moduli, setModuli] = useState<Modulo[]>([]);
   const [lezioni, setLezioni] = useState<Lezione[]>([]);
   const [ore, setOre] = useState(0);
 
-  // Dialog task
   const [dialogModulo, setDialogModulo] = useState(false);
   const [nomeModulo, setNomeModulo] = useState('');
   const [tipoModulo, setTipoModulo] = useState<'scritto' | 'orale' | 'progetto' | 'ore'>('scritto');
 
-  // Dialog voto
   const [dialogVoto, setDialogVoto] = useState(false);
   const [votoStr, setVotoStr] = useState('');
   const [lode, setLode] = useState(false);
 
-  // Dialog lezione
   const [dialogLezione, setDialogLezione] = useState(false);
   const [lezGiorno, setLezGiorno] = useState(0);
   const [lezInizio, setLezInizio] = useState('');
@@ -108,249 +102,309 @@ export default function EsameDetail() {
     load();
   }
 
-  function eliminaModulo(mid: number) {
-    Alert.alert('Elimina task', 'Rimuovere questo task?', [
-      { text: 'Annulla', style: 'cancel' },
-      { text: 'Elimina', style: 'destructive', onPress: () => { deleteModulo(mid); load(); } },
-    ]);
-  }
-
-  function eliminaLezione(lid: number) {
-    Alert.alert('Elimina lezione', 'Rimuovere questa lezione dall\'orario?', [
-      { text: 'Annulla', style: 'cancel' },
-      { text: 'Elimina', style: 'destructive', onPress: () => { deleteLezione(lid); load(); } },
-    ]);
-  }
-
   if (!esame) return null;
 
   const moduliCompletati = moduli.filter((m) => m.completato).length;
   const progressoModuli = moduli.length > 0 ? moduliCompletati / moduli.length : 0;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <SafeAreaView style={[s.safe, { backgroundColor: C.background }]} edges={['bottom']}>
+      <ScrollView contentContainerStyle={s.content}>
 
-        {/* Header */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.rowBetween}>
-              <View style={{ flex: 1 }}>
-                <Text variant="headlineSmall" style={styles.nome}>{esame.nome}</Text>
-                {esame.professore ? (
-                  <Text style={styles.professore}>{esame.professore}</Text>
-                ) : null}
-                <View style={styles.tagRow}>
-                  <View style={[styles.tag, { backgroundColor: colors.primary + '22' }]}>
-                    <Text style={[styles.tagText, { color: colors.primary }]}>
-                      {String(esame.cfu)} CFU
-                    </Text>
-                  </View>
-                  <View style={[styles.tag, { backgroundColor: colors.border }]}>
-                    <Text style={[styles.tagText, { color: colors.textSecondary }]}>
-                      {esame.tipo === 'tirocinio' ? 'Tirocinio' : 'Esame'}
-                    </Text>
-                  </View>
+        {/* Header card */}
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <View style={s.headerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.esameNome, { color: C.textPrimary, fontFamily: fonts.mono }]}>
+                {esame.nome}
+              </Text>
+              {esame.professore ? (
+                <Text style={[s.professore, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+                  {esame.professore}
+                </Text>
+              ) : null}
+              <View style={s.tagRow}>
+                <View style={[s.tag, { backgroundColor: C.accentDim, borderColor: C.accent + '55' }]}>
+                  <Text style={[s.tagText, { color: C.accent, fontFamily: fonts.mono }]}>
+                    {String(esame.cfu)} CFU
+                  </Text>
+                </View>
+                <View style={[s.tag, { backgroundColor: C.border }]}>
+                  <Text style={[s.tagText, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+                    {esame.tipo === 'tirocinio' ? 'TRC' : 'ESAME'}
+                  </Text>
                 </View>
               </View>
-              <View style={styles.votoBox}>
-                {esame.superato ? (
-                  <>
-                    <Text style={styles.votoGrande}>
-                      {esame.voto_finale === 33 ? '30L' : String(esame.voto_finale ?? '✓')}
-                    </Text>
-                    <Text style={styles.muted}>✓ Superato</Text>
-                  </>
-                ) : (
-                  <Button
-                    mode="contained"
-                    compact
-                    onPress={() => setDialogVoto(true)}
-                    style={{ backgroundColor: colors.success }}
-                  >
-                    Segna superato
-                  </Button>
-                )}
-              </View>
             </View>
 
-            {ore > 0 ? (
-              <Text style={[styles.muted, { marginTop: 10 }]}>
-                {String(ore)}h studiate totali
-              </Text>
-            ) : null}
+            <View style={s.votoBox}>
+              {esame.superato ? (
+                <>
+                  <Text style={[s.votoGrande, { color: C.success, fontFamily: fonts.dot }]}>
+                    {esame.voto_finale === 33 ? '30L' : String(esame.voto_finale ?? '✓')}
+                  </Text>
+                  <Text style={[s.superatoTag, { color: C.success, fontFamily: fonts.mono }]}>✓ SUPERATO</Text>
+                </>
+              ) : (
+                <TouchableOpacity
+                  style={[s.superaBtn, { backgroundColor: C.success }]}
+                  onPress={() => setDialogVoto(true)}
+                >
+                  <Text style={[s.superaBtnText, { fontFamily: fonts.mono }]}>Segna{'\n'}superato</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
 
-            {esame.superato && ore > 0 && esame.tipo === 'voto' && esame.voto_finale ? (
-              <View style={styles.roiBox}>
-                <Text style={styles.roiText}>
-                  {String(ore)}h investite · {String(esame.voto_finale === 33 ? '30L' : esame.voto_finale)} · {String(Math.round((ore / esame.cfu) * 10) / 10)}h per CFU
-                </Text>
-              </View>
-            ) : null}
-          </Card.Content>
-        </Card>
+          {ore > 0 ? (
+            <View style={[s.roiRow, { borderTopColor: C.border }]}>
+              <Text style={[s.roiText, { color: C.accent, fontFamily: fonts.dot }]}>
+                {String(ore)}h
+              </Text>
+              <Text style={[s.roiSub, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                studiate totali
+              </Text>
+              {esame.superato && esame.voto_finale && esame.tipo === 'voto' ? (
+                <>
+                  <View style={[s.roiDot, { backgroundColor: C.border }]} />
+                  <Text style={[s.roiText, { color: C.warning, fontFamily: fonts.dot }]}>
+                    {String(Math.round((ore / esame.cfu) * 10) / 10)}h
+                  </Text>
+                  <Text style={[s.roiSub, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                    per CFU
+                  </Text>
+                </>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
 
         {/* Task / Moduli */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.rowBetween}>
-              <Text style={styles.label}>
-                TASK ({String(moduliCompletati)}/{String(moduli.length)})
-              </Text>
-              <Button compact mode="text" icon="plus" textColor={colors.primary} onPress={() => setDialogModulo(true)}>
-                Aggiungi
-              </Button>
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <View style={s.sectionHeader}>
+            <Text style={[s.sectionLabel, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+              TASK ({String(moduliCompletati)}/{String(moduli.length)})
+            </Text>
+            <TouchableOpacity
+              style={[s.addPill, { borderColor: C.accent }]}
+              onPress={() => setDialogModulo(true)}
+            >
+              <MaterialCommunityIcons name="plus" size={12} color={C.accent} />
+              <Text style={[s.addPillText, { color: C.accent, fontFamily: fonts.mono }]}>ADD</Text>
+            </TouchableOpacity>
+          </View>
+
+          {moduli.length > 0 ? (
+            <View style={[s.progressTrack, { backgroundColor: C.border }]}>
+              <View
+                style={[s.progressFill, { width: `${progressoModuli * 100}%` as any, backgroundColor: C.accent }]}
+              />
             </View>
+          ) : null}
 
-            {moduli.length > 0 ? (
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${progressoModuli * 100}%` as any }]} />
-              </View>
-            ) : null}
+          {moduli.length === 0 ? (
+            <Text style={[s.muted, { color: C.textMuted, fontFamily: fonts.mono }]}>
+              Spacchetta l'esame: Scritto, Orale, Progetto...
+            </Text>
+          ) : null}
 
-            {moduli.length === 0 ? (
-              <Text style={styles.muted}>
-                Nessun task. Spacchetta l'esame in moduli (Scritto, Orale, Progetto...).
-              </Text>
-            ) : null}
-
-            {moduli.map((m) => (
-              <View key={m.id} style={styles.moduloRow}>
-                <Checkbox.Android
-                  status={m.completato ? 'checked' : 'unchecked'}
-                  color={colors.primary}
-                  uncheckedColor={colors.border}
-                  onPress={() => { toggleModulo(m.id, m.completato ? 0 : 1); load(); }}
-                />
-                <View style={styles.moduloInfo}>
+          {moduli.map((m) => (
+            <SwipeableRow key={m.id} onDelete={() => { deleteModulo(m.id); load(); }} bottomGap={0}>
+              <TouchableOpacity
+                style={[s.moduloRow, { borderBottomColor: C.border }]}
+                onPress={() => { toggleModulo(m.id, m.completato ? 0 : 1); load(); }}
+                activeOpacity={0.7}
+              >
+                <View style={[s.checkbox, { borderColor: m.completato ? C.accent : C.border, backgroundColor: m.completato ? C.accentDim : 'transparent' }]}>
+                  {m.completato ? (
+                    <MaterialCommunityIcons name="check" size={14} color={C.accent} />
+                  ) : null}
+                </View>
+                <View style={s.moduloInfo}>
                   <Text
-                    variant="bodyMedium"
-                    style={[styles.moduloNome, m.completato ? styles.moduloStrike : undefined]}
+                    style={[
+                      s.moduloNome,
+                      { color: m.completato ? C.textMuted : C.textPrimary, fontFamily: fonts.mono },
+                      m.completato ? s.moduloStrike : undefined,
+                    ]}
                   >
                     {m.nome}
                   </Text>
-                  <View style={[styles.tag, { backgroundColor: tipoColor[m.tipo] + '22' }]}>
-                    <Text style={[styles.tagText, { color: tipoColor[m.tipo] }]}>
-                      {tipoLabel[m.tipo]}
+                  <View style={[s.tipoTag, { backgroundColor: tipoColor[m.tipo] + '22' }]}>
+                    <Text style={[s.tipoTagText, { color: tipoColor[m.tipo], fontFamily: fonts.mono }]}>
+                      {tipoLabel[m.tipo].toUpperCase()}
                     </Text>
                   </View>
                 </View>
-                <IconButton icon="trash-can-outline" size={16} iconColor={colors.textMuted} onPress={() => eliminaModulo(m.id)} />
-              </View>
-            ))}
-          </Card.Content>
-        </Card>
+              </TouchableOpacity>
+            </SwipeableRow>
+          ))}
+        </View>
 
         {/* Orario lezioni */}
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.rowBetween}>
-              <Text style={styles.label}>ORARIO LEZIONI</Text>
-              <Button compact mode="text" icon="plus" textColor={colors.primary} onPress={() => setDialogLezione(true)}>
-                Aggiungi
-              </Button>
-            </View>
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <View style={s.sectionHeader}>
+            <Text style={[s.sectionLabel, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+              ORARIO LEZIONI
+            </Text>
+            <TouchableOpacity
+              style={[s.addPill, { borderColor: C.accent }]}
+              onPress={() => setDialogLezione(true)}
+            >
+              <MaterialCommunityIcons name="plus" size={12} color={C.accent} />
+              <Text style={[s.addPillText, { color: C.accent, fontFamily: fonts.mono }]}>ADD</Text>
+            </TouchableOpacity>
+          </View>
 
-            {lezioni.length === 0 ? (
-              <Text style={styles.muted}>
-                Nessuna lezione. Aggiungi giorno, orario e aula.
-              </Text>
-            ) : null}
+          {lezioni.length === 0 ? (
+            <Text style={[s.muted, { color: C.textMuted, fontFamily: fonts.mono }]}>
+              Aggiungi giorno, orario e aula.
+            </Text>
+          ) : null}
 
-            {lezioni.map((l) => (
-              <View key={l.id} style={[styles.lezioneRow, { borderLeftColor: l.colore }]}>
-                <View style={styles.lezioneOrario}>
-                  <Text style={[styles.lezOra, { color: l.colore }]}>{l.ora_inizio}</Text>
-                  <Text style={styles.lezSep}>→</Text>
-                  <Text style={styles.lezOraFine}>{l.ora_fine}</Text>
+          {lezioni.map((l) => (
+            <SwipeableRow key={l.id} onDelete={() => { deleteLezione(l.id); load(); }} bottomGap={0}>
+              <View style={[s.lezioneRow, { borderBottomColor: C.border, borderLeftColor: l.colore }]}>
+                <View style={s.lezioneOrario}>
+                  <Text style={[s.lezOra, { color: l.colore, fontFamily: fonts.dot }]}>
+                    {l.ora_inizio}
+                  </Text>
+                  <Text style={[s.lezSep, { color: C.textMuted }]}>↓</Text>
+                  <Text style={[s.lezOraFine, { color: C.textSecondary, fontFamily: fonts.dot }]}>
+                    {l.ora_fine}
+                  </Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.lezGiorno}>{GIORNI[l.giorno]}</Text>
-                  <View style={[styles.tag, { backgroundColor: l.colore + '22', alignSelf: 'flex-start' }]}>
-                    <Text style={[styles.tagText, { color: l.colore }]}>{l.aula}</Text>
+                  <Text style={[s.lezGiorno, { color: C.textPrimary, fontFamily: fonts.mono }]}>
+                    {GIORNI[l.giorno]}
+                  </Text>
+                  <View style={[s.aulaTag, { backgroundColor: l.colore + '22', borderColor: l.colore + '55' }]}>
+                    <Text style={[s.aulaText, { color: l.colore, fontFamily: fonts.mono }]}>
+                      {l.aula}
+                    </Text>
                   </View>
                 </View>
-                <IconButton icon="trash-can-outline" size={16} iconColor={colors.textMuted} onPress={() => eliminaLezione(l.id)} />
               </View>
-            ))}
-          </Card.Content>
-        </Card>
+            </SwipeableRow>
+          ))}
+        </View>
 
-        <Button
-          mode="outlined"
-          icon="timer-outline"
-          style={styles.studiaBtn}
-          textColor={colors.secondary}
+        {/* Vai a studio */}
+        <TouchableOpacity
+          style={[s.studiaBtn, { borderColor: C.accent }]}
           onPress={() => router.push('/(tabs)/studio')}
         >
-          Vai alla sessione di studio
-        </Button>
+          <MaterialCommunityIcons name="timer-outline" size={18} color={C.accent} />
+          <Text style={[s.studiaBtnText, { color: C.accent, fontFamily: fonts.mono }]}>
+            SESSIONE DI STUDIO
+          </Text>
+        </TouchableOpacity>
+
       </ScrollView>
+
+      {/* FAB */}
+      <TouchableOpacity
+        style={[s.fab, { backgroundColor: C.accent }]}
+        onPress={() => router.push('/(tabs)/studio')}
+        activeOpacity={0.85}
+      >
+        <MaterialCommunityIcons name="timer-outline" size={24} color="#000000" />
+      </TouchableOpacity>
 
       {/* Dialogs */}
       <Portal>
         {/* Dialog task */}
-        <Dialog visible={dialogModulo} onDismiss={() => setDialogModulo(false)} style={styles.dialog}>
-          <Dialog.Title style={{ color: colors.textPrimary }}>Nuovo Task</Dialog.Title>
-          <Dialog.Content style={{ gap: 12 }}>
+        <Dialog
+          visible={dialogModulo}
+          onDismiss={() => setDialogModulo(false)}
+          style={[s.dialog, { backgroundColor: C.surface }]}
+        >
+          <Dialog.Title style={[s.dialogTitle, { color: C.textPrimary, fontFamily: fonts.mono }]}>
+            Nuovo Task
+          </Dialog.Title>
+          <Dialog.Content style={s.dialogContent}>
             <TextInput
               label="Nome task (es. Scritto, Orale...)"
               value={nomeModulo}
               onChangeText={setNomeModulo}
               mode="outlined"
-              outlineColor={colors.border}
-              activeOutlineColor={colors.primary}
-              textColor={colors.textPrimary}
-              style={styles.input}
+              outlineColor={C.border}
+              activeOutlineColor={C.accent}
+              textColor={C.textPrimary}
+              style={[s.input, { backgroundColor: C.card }]}
             />
-            <SegmentedButtons
-              value={tipoModulo}
-              onValueChange={(v) => setTipoModulo(v as typeof tipoModulo)}
-              buttons={[
-                { value: 'scritto', label: 'Scritto' },
-                { value: 'orale', label: 'Orale' },
-                { value: 'progetto', label: 'Prog.' },
-                { value: 'ore', label: 'Ore' },
-              ]}
-            />
+            <View style={s.tipoRow}>
+              {(['scritto', 'orale', 'progetto', 'ore'] as const).map((t) => (
+                <TouchableOpacity
+                  key={t}
+                  onPress={() => setTipoModulo(t)}
+                  style={[
+                    s.tipoPill,
+                    { borderColor: tipoModulo === t ? tipoColor[t] : C.border },
+                    tipoModulo === t && { backgroundColor: tipoColor[t] + '22' },
+                  ]}
+                >
+                  <Text style={[s.tipoPillText, { color: tipoModulo === t ? tipoColor[t] : C.textMuted, fontFamily: fonts.mono }]}>
+                    {t.toUpperCase().slice(0, 4)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button textColor={colors.textSecondary} onPress={() => setDialogModulo(false)}>Annulla</Button>
-            <Button mode="contained" onPress={salvaModulo} disabled={!nomeModulo.trim()}>Aggiungi</Button>
+            <Button textColor={C.textSecondary} onPress={() => setDialogModulo(false)}>Annulla</Button>
+            <Button mode="contained" onPress={salvaModulo} disabled={!nomeModulo.trim()} buttonColor={C.accent} textColor="#000">
+              Aggiungi
+            </Button>
           </Dialog.Actions>
         </Dialog>
 
         {/* Dialog voto */}
-        <Dialog visible={dialogVoto} onDismiss={() => setDialogVoto(false)} style={styles.dialog}>
-          <Dialog.Title style={{ color: colors.textPrimary }}>Registra Voto</Dialog.Title>
-          <Dialog.Content style={{ gap: 12 }}>
+        <Dialog
+          visible={dialogVoto}
+          onDismiss={() => setDialogVoto(false)}
+          style={[s.dialog, { backgroundColor: C.surface }]}
+        >
+          <Dialog.Title style={[s.dialogTitle, { color: C.textPrimary, fontFamily: fonts.mono }]}>
+            Registra Voto
+          </Dialog.Title>
+          <Dialog.Content style={s.dialogContent}>
             <TextInput
-              label="Voto (18-30)"
+              label="Voto (18–30)"
               value={votoStr}
               onChangeText={setVotoStr}
               keyboardType="numeric"
               mode="outlined"
-              outlineColor={colors.border}
-              activeOutlineColor={colors.primary}
-              textColor={colors.textPrimary}
-              style={styles.input}
+              outlineColor={C.border}
+              activeOutlineColor={C.accent}
+              textColor={C.textPrimary}
+              style={[s.input, { backgroundColor: C.card }]}
             />
-            <Button
-              mode={lode ? 'contained' : 'outlined'}
+            <TouchableOpacity
+              style={[
+                s.lodeBtn,
+                { borderColor: lode ? C.success : C.border, backgroundColor: lode ? C.success + '22' : 'transparent' },
+              ]}
               onPress={() => setLode((l) => !l)}
-              style={lode ? { backgroundColor: colors.success } : { borderColor: colors.border }}
-              textColor={lode ? colors.textPrimary : colors.textSecondary}
             >
-              {lode ? '✓ Con lode (30L)' : 'Con lode?'}
-            </Button>
+              <MaterialCommunityIcons
+                name={lode ? 'star' : 'star-outline'}
+                size={18}
+                color={lode ? C.success : C.textMuted}
+              />
+              <Text style={[s.lodeBtnText, { color: lode ? C.success : C.textMuted, fontFamily: fonts.mono }]}>
+                {lode ? 'CON LODE (30L)' : 'CON LODE?'}
+              </Text>
+            </TouchableOpacity>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button textColor={colors.textSecondary} onPress={() => setDialogVoto(false)}>Annulla</Button>
+            <Button textColor={C.textSecondary} onPress={() => setDialogVoto(false)}>Annulla</Button>
             <Button
               mode="contained"
               onPress={salvaVoto}
               disabled={!votoStr || parseInt(votoStr, 10) < 18 || parseInt(votoStr, 10) > 30}
-              style={{ backgroundColor: colors.success }}
+              buttonColor={C.success}
+              textColor="#000"
             >
               Salva
             </Button>
@@ -358,28 +412,33 @@ export default function EsameDetail() {
         </Dialog>
 
         {/* Dialog lezione */}
-        <Dialog visible={dialogLezione} onDismiss={() => setDialogLezione(false)} style={styles.dialog}>
-          <Dialog.Title style={{ color: colors.textPrimary }}>Aggiungi Lezione</Dialog.Title>
-          <Dialog.ScrollArea style={{ maxHeight: 420, paddingHorizontal: 24 }}>
-            <ScrollView contentContainerStyle={{ gap: 12, paddingVertical: 8 }}>
-              <Text style={styles.fieldLabel}>GIORNO</Text>
+        <Dialog
+          visible={dialogLezione}
+          onDismiss={() => setDialogLezione(false)}
+          style={[s.dialog, { backgroundColor: C.surface }]}
+        >
+          <Dialog.Title style={[s.dialogTitle, { color: C.textPrimary, fontFamily: fonts.mono }]}>
+            Aggiungi Lezione
+          </Dialog.Title>
+          <Dialog.ScrollArea style={{ maxHeight: 440, paddingHorizontal: 24 }}>
+            <ScrollView contentContainerStyle={{ gap: 14, paddingVertical: 8 }}>
+              <Text style={[s.fieldLabel, { color: C.textSecondary, fontFamily: fonts.mono }]}>GIORNO</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   {GIORNI.slice(0, 6).map((g, i) => (
-                    <Button
+                    <TouchableOpacity
                       key={i}
-                      mode={lezGiorno === i ? 'contained' : 'outlined'}
-                      compact
                       onPress={() => setLezGiorno(i)}
-                      style={lezGiorno === i
-                        ? { backgroundColor: colors.primary }
-                        : { borderColor: colors.border }
-                      }
-                      labelStyle={{ fontSize: 12 }}
-                      textColor={lezGiorno === i ? colors.textPrimary : colors.textSecondary}
+                      style={[
+                        s.giornoPill,
+                        { borderColor: lezGiorno === i ? C.accent : C.border },
+                        lezGiorno === i && { backgroundColor: C.accentDim },
+                      ]}
                     >
-                      {g.slice(0, 3)}
-                    </Button>
+                      <Text style={[s.giornoPillText, { color: lezGiorno === i ? C.accent : C.textSecondary, fontFamily: fonts.mono }]}>
+                        {g.slice(0, 3).toUpperCase()}
+                      </Text>
+                    </TouchableOpacity>
                   ))}
                 </View>
               </ScrollView>
@@ -390,20 +449,20 @@ export default function EsameDetail() {
                   value={lezInizio}
                   onChangeText={setLezInizio}
                   mode="outlined"
-                  outlineColor={colors.border}
-                  activeOutlineColor={colors.primary}
-                  textColor={colors.textPrimary}
-                  style={[styles.input, { flex: 1 }]}
+                  outlineColor={C.border}
+                  activeOutlineColor={C.accent}
+                  textColor={C.textPrimary}
+                  style={[s.input, { flex: 1, backgroundColor: C.card }]}
                 />
                 <TextInput
                   label="Fine (11:00)"
                   value={lezFine}
                   onChangeText={setLezFine}
                   mode="outlined"
-                  outlineColor={colors.border}
-                  activeOutlineColor={colors.primary}
-                  textColor={colors.textPrimary}
-                  style={[styles.input, { flex: 1 }]}
+                  outlineColor={C.border}
+                  activeOutlineColor={C.accent}
+                  textColor={C.textPrimary}
+                  style={[s.input, { flex: 1, backgroundColor: C.card }]}
                 />
               </View>
 
@@ -412,122 +471,137 @@ export default function EsameDetail() {
                 value={lezAula}
                 onChangeText={setLezAula}
                 mode="outlined"
-                outlineColor={colors.border}
-                activeOutlineColor={colors.primary}
-                textColor={colors.textPrimary}
-                style={styles.input}
+                outlineColor={C.border}
+                activeOutlineColor={C.accent}
+                textColor={C.textPrimary}
+                style={[s.input, { backgroundColor: C.card }]}
               />
 
-              <Text style={styles.fieldLabel}>COLORE</Text>
+              <Text style={[s.fieldLabel, { color: C.textSecondary, fontFamily: fonts.mono }]}>COLORE</Text>
               <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
                 {PALETTE.map((c) => (
-                  <View
+                  <TouchableOpacity
                     key={c}
                     style={[
-                      styles.colorDot,
+                      s.colorDot,
                       { backgroundColor: c },
-                      lezColore === c && styles.colorDotSelected,
+                      lezColore === c && { borderWidth: 3, borderColor: '#FFFFFF' },
                     ]}
-                    onTouchEnd={() => setLezColore(c)}
+                    onPress={() => setLezColore(c)}
                   />
                 ))}
               </View>
             </ScrollView>
           </Dialog.ScrollArea>
           <Dialog.Actions>
-            <Button textColor={colors.textSecondary} onPress={() => setDialogLezione(false)}>Annulla</Button>
+            <Button textColor={C.textSecondary} onPress={() => setDialogLezione(false)}>Annulla</Button>
             <Button
               mode="contained"
               onPress={salvaLezione}
               disabled={!lezInizio.trim() || !lezFine.trim() || !lezAula.trim()}
+              buttonColor={C.accent}
+              textColor="#000"
             >
               Aggiungi
             </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
-
-      <FAB
-        icon="timer-outline"
-        label="Studia ora"
-        style={styles.fab}
-        color={colors.textPrimary}
-        onPress={() => router.push('/(tabs)/studio')}
-      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+const s = StyleSheet.create({
+  safe: { flex: 1 },
   content: { padding: 16, gap: 12, paddingBottom: 100 },
-  card: { backgroundColor: colors.card, borderRadius: 16 },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  nome: { color: colors.textPrimary, fontWeight: '700', marginBottom: 4 },
-  professore: { color: colors.textSecondary, fontSize: 13, marginBottom: 8 },
+  card: { borderRadius: 16, borderWidth: 1, padding: 16 },
+  headerRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  esameNome: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
+  professore: { fontSize: 13, marginBottom: 8 },
   tagRow: { flexDirection: 'row', gap: 6 },
-  tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: StyleSheet.hairlineWidth },
   tagText: { fontSize: 11, fontWeight: '700' },
-  votoBox: { alignItems: 'flex-end', marginLeft: 8 },
-  votoGrande: { fontSize: 36, fontWeight: '800', color: colors.success },
-  muted: { color: colors.textMuted, fontSize: 12 },
-  roiBox: { backgroundColor: colors.surface, borderRadius: 8, padding: 10, marginTop: 10 },
-  roiText: { color: colors.secondary, fontSize: 13, fontWeight: '600' },
-  label: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-    marginBottom: 8,
+  votoBox: { alignItems: 'center', gap: 4 },
+  votoGrande: { fontSize: 44, lineHeight: 46 },
+  superatoTag: { fontSize: 11, letterSpacing: 0.5 },
+  superaBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    alignItems: 'center',
   },
-  fieldLabel: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-  },
-  progressTrack: {
-    height: 4,
-    backgroundColor: colors.border,
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: 2 },
+  superaBtnText: { color: '#000', fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  roiRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  roiText: { fontSize: 28, lineHeight: 30 },
+  roiSub: { fontSize: 11 },
+  roiDot: { width: 4, height: 4, borderRadius: 2, marginHorizontal: 4 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionLabel: { fontSize: 10, letterSpacing: 2 },
+  addPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
+  addPillText: { fontSize: 11, letterSpacing: 0.5 },
+  progressTrack: { height: 2, borderRadius: 1, overflow: 'hidden', marginBottom: 12 },
+  progressFill: { height: '100%' },
+  muted: { fontSize: 12, lineHeight: 18 },
   moduloRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingVertical: 10,
+    gap: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   moduloInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  moduloNome: { color: colors.textPrimary, flex: 1 },
-  moduloStrike: { color: colors.textMuted, textDecorationLine: 'line-through' },
+  moduloNome: { flex: 1, fontSize: 14 },
+  moduloStrike: { textDecorationLine: 'line-through' },
+  tipoTag: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
+  tipoTagText: { fontSize: 10, fontWeight: '700' },
   lezioneRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderLeftWidth: 3,
+    borderLeftWidth: 2,
     paddingLeft: 10,
-    paddingVertical: 8,
-    marginBottom: 8,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 12,
   },
   lezioneOrario: { alignItems: 'center', minWidth: 50 },
-  lezOra: { fontSize: 14, fontWeight: '800' },
-  lezSep: { color: colors.textMuted, fontSize: 10 },
-  lezOraFine: { color: colors.textSecondary, fontSize: 12 },
-  lezGiorno: { color: colors.textPrimary, fontWeight: '600', fontSize: 13, marginBottom: 4 },
-  studiaBtn: { borderColor: colors.secondary, borderRadius: 12 },
-  dialog: { backgroundColor: colors.surface },
-  input: { backgroundColor: colors.card },
-  colorDot: { width: 28, height: 28, borderRadius: 14 },
-  colorDotSelected: { borderWidth: 3, borderColor: colors.textPrimary },
+  lezOra: { fontSize: 18, lineHeight: 20 },
+  lezSep: { fontSize: 10 },
+  lezOraFine: { fontSize: 14, lineHeight: 16 },
+  lezGiorno: { fontSize: 13, fontWeight: '600', marginBottom: 4 },
+  aulaTag: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: StyleSheet.hairlineWidth },
+  aulaText: { fontSize: 11, fontWeight: '700' },
+  studiaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+  },
+  studiaBtnText: { fontSize: 13, letterSpacing: 1 },
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 24,
-    backgroundColor: colors.secondary,
-    borderRadius: 16,
+    bottom: 28,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  dialog: { borderRadius: 20 },
+  dialogTitle: { fontSize: 18 },
+  dialogContent: { gap: 12 },
+  input: {},
+  tipoRow: { flexDirection: 'row', gap: 6 },
+  tipoPill: { flex: 1, paddingVertical: 8, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+  tipoPillText: { fontSize: 11, letterSpacing: 0.3 },
+  lodeBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
+  lodeBtnText: { fontSize: 13, letterSpacing: 0.5 },
+  fieldLabel: { fontSize: 10, letterSpacing: 2 },
+  giornoPill: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
+  giornoPillText: { fontSize: 12, letterSpacing: 0.5 },
+  colorDot: { width: 30, height: 30, borderRadius: 15 },
 });

@@ -1,29 +1,38 @@
 import { Tabs } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors } from '@/theme';
+import { useColors, fonts } from '@/theme';
 
 type IconProps = { color: string; size: number };
 
 export default function TabLayout() {
+  const C = useColors();
   return (
     <Tabs
       screenOptions={{
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-        },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
         headerShown: false,
+        tabBarStyle: {
+          backgroundColor: C.background,
+          borderTopColor: C.border,
+          borderTopWidth: 1,
+          height: 58,
+          paddingBottom: 8,
+          paddingTop: 6,
+        },
+        tabBarActiveTintColor: C.accent,
+        tabBarInactiveTintColor: C.textMuted,
+        tabBarLabelStyle: {
+          fontFamily: fonts.mono,
+          fontSize: 10,
+          letterSpacing: 0.3,
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Prospetto',
+          title: 'Home',
           tabBarIcon: ({ color, size }: IconProps) => (
-            <MaterialCommunityIcons name="view-dashboard" size={size} color={color} />
+            <MaterialCommunityIcons name="view-dashboard-outline" size={size} color={color} />
           ),
         }}
       />
@@ -32,7 +41,7 @@ export default function TabLayout() {
         options={{
           title: 'Esami',
           tabBarIcon: ({ color, size }: IconProps) => (
-            <MaterialCommunityIcons name="school" size={size} color={color} />
+            <MaterialCommunityIcons name="school-outline" size={size} color={color} />
           ),
         }}
       />
@@ -50,14 +59,14 @@ export default function TabLayout() {
         options={{
           title: 'Orario',
           tabBarIcon: ({ color, size }: IconProps) => (
-            <MaterialCommunityIcons name="calendar-clock" size={size} color={color} />
+            <MaterialCommunityIcons name="calendar-week-outline" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="simulatore"
         options={{
-          title: 'Simulatore',
+          title: 'Sim.',
           tabBarIcon: ({ color, size }: IconProps) => (
             <MaterialCommunityIcons name="chart-line" size={size} color={color} />
           ),

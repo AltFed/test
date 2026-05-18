@@ -1,43 +1,33 @@
 import { useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, Alert } from 'react-native';
-import {
-  Text,
-  FAB,
-  Portal,
-  Dialog,
-  Button,
-  TextInput,
-  SegmentedButtons,
-  Menu,
-  IconButton,
-  Divider,
-} from 'react-native-paper';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text, Portal, Dialog, Button, TextInput } from 'react-native-paper';
 import { useFocusEffect, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '@/theme';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useColors, fonts } from '@/theme';
+import { SwipeableRow } from '@/components/SwipeableRow';
 import { getAllEsami, insertEsame, deleteEsame, getOreStudiate } from '@/db/database';
 import type { Esame } from '@/db/types';
 
 type Filtro = 'tutti' | 'da_fare' | 'superati';
 
-const ACCENT_COLORS = [
-  colors.primary,
-  colors.secondary,
-  colors.warning,
-  colors.success,
-  '#FF6B9D',
-  '#C084FC',
-];
+const ACCENTS = ['#FFE600', '#30D158', '#0A84FF', '#FF9F0A', '#FF453A', '#BF5AF2'];
 
 function accentForIndex(i: number): string {
-  return ACCENT_COLORS[i % ACCENT_COLORS.length];
+  return ACCENTS[i % ACCENTS.length];
 }
 
+const FILTRI: { key: Filtro; label: string }[] = [
+  { key: 'tutti', label: 'TUTTI' },
+  { key: 'da_fare', label: 'DA FARE' },
+  { key: 'superati', label: 'SUPERATI' },
+];
+
 export default function EsamiScreen() {
+  const C = useColors();
   const [esami, setEsami] = useState<Esame[]>([]);
   const [filtro, setFiltro] = useState<Filtro>('tutti');
   const [dialogVisible, setDialogVisible] = useState(false);
-  const [menuEsameId, setMenuEsameId] = useState<number | null>(null);
   const [oreMap, setOreMap] = useState<Record<number, number>>({});
 
   const [nome, setNome] = useState('');
@@ -76,38 +66,45 @@ export default function EsamiScreen() {
     load();
   }
 
-  function elimina(id: number) {
-    Alert.alert('Elimina esame', 'Verranno eliminati anche sessioni e moduli.', [
-      { text: 'Annulla', style: 'cancel' },
-      { text: 'Elimina', style: 'destructive', onPress: () => { deleteEsame(id); load(); } },
-    ]);
-  }
-
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Text variant="headlineMedium" style={styles.title}>Esami</Text>
-        <Text variant="bodySmall" style={styles.subtitle}>
-          {esami.filter((e) => e.superato).length}/{esami.length} superati
-        </Text>
+    <SafeAreaView style={[s.safe, { backgroundColor: C.background }]} edges={['top']}>
+      {/* Header */}
+      <View style={s.header}>
+        <View>
+          <Text style={[s.title, { color: C.textPrimary, fontFamily: fonts.dot }]}>Esami</Text>
+          <Text style={[s.subtitle, { color: C.textMuted, fontFamily: fonts.mono }]}>
+            {esami.filter((e) => e.superato).length}/{esami.length} superati
+          </Text>
+        </View>
       </View>
 
-      <View style={styles.filterRow}>
-        <SegmentedButtons
-          value={filtro}
-          onValueChange={(v) => setFiltro(v as Filtro)}
-          buttons={[
-            { value: 'tutti', label: 'Tutti' },
-            { value: 'da_fare', label: 'Da fare' },
-            { value: 'superati', label: 'Superati' },
-          ]}
-          style={styles.segmented}
-        />
+      {/* Filter pills */}
+      <View style={s.filterRow}>
+        {FILTRI.map((f) => (
+          <TouchableOpacity
+            key={f.key}
+            onPress={() => setFiltro(f.key)}
+            style={[
+              s.filterPill,
+              { borderColor: filtro === f.key ? C.accent : C.border },
+              filtro === f.key && { backgroundColor: C.accentDim },
+            ]}
+          >
+            <Text
+              style={[
+                s.filterLabel,
+                { color: filtro === f.key ? C.accent : C.textMuted, fontFamily: fonts.mono },
+              ]}
+            >
+              {f.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView style={s.scroll} contentContainerStyle={s.content}>
         {filtered.length === 0 && (
-          <Text style={styles.empty}>
+          <Text style={[s.empty, { color: C.textMuted, fontFamily: fonts.mono }]}>
             {filtro === 'tutti'
               ? 'Nessun esame. Aggiungine uno con + in basso.'
               : 'Nessun esame in questa categoria.'}
@@ -118,107 +115,96 @@ export default function EsamiScreen() {
           const accent = accentForIndex(index);
           const ore = oreMap[esame.id] ?? 0;
           return (
-            <View
-              key={esame.id}
-              style={[styles.card, { borderLeftColor: accent }]}
-            >
-              <View
-                style={styles.cardInner}
-                onTouchEnd={() => router.push(`/esame/${esame.id}`)}
+            <SwipeableRow key={esame.id} onDelete={() => { deleteEsame(esame.id); load(); }} bottomGap={10}>
+              <TouchableOpacity
+                style={[s.card, { backgroundColor: C.card, borderColor: C.border, borderLeftColor: accent }]}
+                onPress={() => router.push(`/esame/${esame.id}`)}
+                activeOpacity={0.7}
               >
-                {/* Nome + menu */}
-                <View style={styles.cardTop}>
+                <View style={s.cardMain}>
                   <View style={{ flex: 1 }}>
-                    <Text variant="titleMedium" style={styles.esameNome} numberOfLines={1}>
+                    <Text style={[s.esameNome, { color: C.textPrimary, fontFamily: fonts.mono }]} numberOfLines={1}>
                       {esame.nome}
                     </Text>
                     {esame.professore ? (
-                      <Text variant="bodySmall" style={styles.professore} numberOfLines={1}>
+                      <Text style={[s.professore, { color: C.textSecondary, fontFamily: fonts.mono }]} numberOfLines={1}>
                         {esame.professore}
                       </Text>
                     ) : null}
+                    <View style={s.tagRow}>
+                      <View style={[s.tag, { backgroundColor: accent + '22', borderColor: accent + '55' }]}>
+                        <Text style={[s.tagText, { color: accent, fontFamily: fonts.mono }]}>
+                          {String(esame.cfu)} CFU
+                        </Text>
+                      </View>
+                      {esame.tipo === 'tirocinio' ? (
+                        <View style={[s.tag, { backgroundColor: C.border }]}>
+                          <Text style={[s.tagText, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+                            TRC
+                          </Text>
+                        </View>
+                      ) : null}
+                      {ore > 0 ? (
+                        <Text style={[s.oreText, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                          {String(ore)}h
+                        </Text>
+                      ) : null}
+                    </View>
                   </View>
-
-                  <View style={styles.cardRight}>
+                  <View style={s.votoBox}>
                     {esame.superato ? (
-                      <Text style={[styles.votoText, { color: accent }]}>
+                      <Text style={[s.voto, { color: accent, fontFamily: fonts.dot }]}>
                         {esame.voto_finale === 33 ? '30L' : String(esame.voto_finale ?? '✓')}
                       </Text>
                     ) : (
-                      <Text style={styles.votoMuted}>—</Text>
+                      <MaterialCommunityIcons name="chevron-right" size={18} color={C.textMuted} />
                     )}
-                    <Menu
-                      visible={menuEsameId === esame.id}
-                      onDismiss={() => setMenuEsameId(null)}
-                      anchor={
-                        <IconButton
-                          icon="dots-vertical"
-                          size={18}
-                          iconColor={colors.textMuted}
-                          onPress={() => setMenuEsameId(esame.id)}
-                        />
-                      }
-                    >
-                      <Menu.Item
-                        onPress={() => { setMenuEsameId(null); router.push(`/esame/${esame.id}`); }}
-                        title="Apri dettaglio"
-                        leadingIcon="open-in-app"
-                      />
-                      <Divider />
-                      <Menu.Item
-                        onPress={() => { setMenuEsameId(null); elimina(esame.id); }}
-                        title="Elimina"
-                        leadingIcon="trash-can-outline"
-                      />
-                    </Menu>
                   </View>
                 </View>
-
-                {/* Footer */}
-                <View style={styles.cardFooter}>
-                  <View style={[styles.tag, { backgroundColor: accent + '22' }]}>
-                    <Text style={[styles.tagText, { color: accent }]}>
-                      {String(esame.cfu)} CFU
-                    </Text>
-                  </View>
-                  {esame.tipo === 'tirocinio' ? (
-                    <View style={[styles.tag, { backgroundColor: colors.secondary + '22' }]}>
-                      <Text style={[styles.tagText, { color: colors.secondary }]}>Tirocinio</Text>
-                    </View>
-                  ) : null}
-                  {ore > 0 ? (
-                    <Text style={styles.oreText}>{String(ore)}h studiate</Text>
-                  ) : null}
-                </View>
-              </View>
-            </View>
+              </TouchableOpacity>
+            </SwipeableRow>
           );
         })}
       </ScrollView>
 
+      {/* FAB */}
+      <TouchableOpacity
+        style={[s.fab, { backgroundColor: C.accent }]}
+        onPress={() => setDialogVisible(true)}
+        activeOpacity={0.85}
+      >
+        <MaterialCommunityIcons name="plus" size={26} color="#000000" />
+      </TouchableOpacity>
+
       <Portal>
-        <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)} style={styles.dialog}>
-          <Dialog.Title style={{ color: colors.textPrimary }}>Nuovo Esame</Dialog.Title>
-          <Dialog.Content style={{ gap: 12 }}>
+        <Dialog
+          visible={dialogVisible}
+          onDismiss={() => setDialogVisible(false)}
+          style={[s.dialog, { backgroundColor: C.surface }]}
+        >
+          <Dialog.Title style={[s.dialogTitle, { color: C.textPrimary, fontFamily: fonts.mono }]}>
+            Nuovo Esame
+          </Dialog.Title>
+          <Dialog.Content style={s.dialogContent}>
             <TextInput
               label="Nome esame"
               value={nome}
               onChangeText={setNome}
               mode="outlined"
-              outlineColor={colors.border}
-              activeOutlineColor={colors.primary}
-              textColor={colors.textPrimary}
-              style={styles.input}
+              outlineColor={C.border}
+              activeOutlineColor={C.accent}
+              textColor={C.textPrimary}
+              style={[s.input, { backgroundColor: C.card }]}
             />
             <TextInput
               label="Professore (opzionale)"
               value={professore}
               onChangeText={setProfessore}
               mode="outlined"
-              outlineColor={colors.border}
-              activeOutlineColor={colors.primary}
-              textColor={colors.textPrimary}
-              style={styles.input}
+              outlineColor={C.border}
+              activeOutlineColor={C.accent}
+              textColor={C.textPrimary}
+              style={[s.input, { backgroundColor: C.card }]}
             />
             <TextInput
               label="CFU"
@@ -226,19 +212,28 @@ export default function EsamiScreen() {
               onChangeText={setCfu}
               keyboardType="numeric"
               mode="outlined"
-              outlineColor={colors.border}
-              activeOutlineColor={colors.primary}
-              textColor={colors.textPrimary}
-              style={styles.input}
+              outlineColor={C.border}
+              activeOutlineColor={C.accent}
+              textColor={C.textPrimary}
+              style={[s.input, { backgroundColor: C.card }]}
             />
-            <SegmentedButtons
-              value={tipo}
-              onValueChange={(v) => setTipo(v as 'voto' | 'tirocinio')}
-              buttons={[
-                { value: 'voto', label: 'Voto (30mi)' },
-                { value: 'tirocinio', label: 'Tirocinio' },
-              ]}
-            />
+            <View style={s.tipoRow}>
+              {(['voto', 'tirocinio'] as const).map((t) => (
+                <TouchableOpacity
+                  key={t}
+                  onPress={() => setTipo(t)}
+                  style={[
+                    s.tipoPill,
+                    { borderColor: tipo === t ? C.accent : C.border },
+                    tipo === t && { backgroundColor: C.accentDim },
+                  ]}
+                >
+                  <Text style={[s.tipoPillText, { color: tipo === t ? C.accent : C.textMuted, fontFamily: fonts.mono }]}>
+                    {t === 'voto' ? 'VOTO (30mi)' : 'TIROCINIO'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             {tipo === 'tirocinio' ? (
               <TextInput
                 label="Ore target tirocinio"
@@ -246,68 +241,77 @@ export default function EsamiScreen() {
                 onChangeText={setOreTarget}
                 keyboardType="numeric"
                 mode="outlined"
-                outlineColor={colors.border}
-                activeOutlineColor={colors.primary}
-                textColor={colors.textPrimary}
-                style={styles.input}
+                outlineColor={C.border}
+                activeOutlineColor={C.accent}
+                textColor={C.textPrimary}
+                style={[s.input, { backgroundColor: C.card }]}
               />
             ) : null}
           </Dialog.Content>
           <Dialog.Actions>
-            <Button textColor={colors.textSecondary} onPress={() => setDialogVisible(false)}>
-              Annulla
-            </Button>
-            <Button mode="contained" onPress={salvaEsame} disabled={!nome.trim() || !cfu.trim()}>
+            <Button textColor={C.textSecondary} onPress={() => setDialogVisible(false)}>Annulla</Button>
+            <Button
+              mode="contained"
+              onPress={salvaEsame}
+              disabled={!nome.trim() || !cfu.trim()}
+              buttonColor={C.accent}
+              textColor="#000000"
+            >
               Aggiungi
             </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
-
-      <FAB
-        icon="plus"
-        style={styles.fab}
-        onPress={() => setDialogVisible(true)}
-        color={colors.textPrimary}
-      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
-  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 },
-  title: { color: colors.textPrimary, fontWeight: '800' },
-  subtitle: { color: colors.textMuted, marginTop: 2 },
-  filterRow: { paddingHorizontal: 16, paddingBottom: 10 },
-  segmented: { backgroundColor: colors.surface },
-  scroll: { flex: 1 },
-  content: { padding: 16, gap: 10, paddingBottom: 100 },
-  empty: { color: colors.textMuted, textAlign: 'center', marginTop: 40 },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: 14,
-    borderLeftWidth: 4,
-    overflow: 'hidden',
+const s = StyleSheet.create({
+  safe: { flex: 1 },
+  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
+  title: { fontSize: 36, lineHeight: 38 },
+  subtitle: { fontSize: 12, marginTop: 2 },
+  filterRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 8 },
+  filterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  cardInner: { padding: 14 },
-  cardTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
-  esameNome: { color: colors.textPrimary, fontWeight: '700', marginBottom: 2 },
-  professore: { color: colors.textSecondary },
-  cardRight: { alignItems: 'flex-end', marginLeft: 8 },
-  votoText: { fontSize: 24, fontWeight: '800', lineHeight: 28 },
-  votoMuted: { fontSize: 24, fontWeight: '800', color: colors.border, lineHeight: 28 },
-  cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  filterLabel: { fontSize: 11, letterSpacing: 0.5 },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 100, gap: 10 },
+  empty: { textAlign: 'center', marginTop: 40, fontSize: 13, lineHeight: 20 },
+  card: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderLeftWidth: 3,
+    padding: 14,
+  },
+  cardMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  esameNome: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  professore: { fontSize: 12, marginBottom: 6 },
+  tagRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  tag: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: StyleSheet.hairlineWidth },
   tagText: { fontSize: 11, fontWeight: '700' },
-  oreText: { color: colors.textMuted, fontSize: 12, marginLeft: 'auto' },
-  dialog: { backgroundColor: colors.surface },
-  input: { backgroundColor: colors.card },
+  oreText: { fontSize: 11 },
+  votoBox: { alignItems: 'flex-end', minWidth: 40 },
+  voto: { fontSize: 30, lineHeight: 32 },
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 24,
-    backgroundColor: colors.primary,
-    borderRadius: 16,
+    bottom: 28,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  dialog: { borderRadius: 20 },
+  dialogTitle: { fontSize: 18 },
+  dialogContent: { gap: 12 },
+  input: {},
+  tipoRow: { flexDirection: 'row', gap: 8 },
+  tipoPill: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
+  tipoPillText: { fontSize: 11, letterSpacing: 0.3 },
 });

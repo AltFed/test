@@ -1,3 +1,20 @@
+diff --git a/node_modules/expo/AppEntry.js b/node_modules/expo/AppEntry.js
+index 9248732..b79ee3d 100644
+--- a/node_modules/expo/AppEntry.js
++++ b/node_modules/expo/AppEntry.js
+@@ -1,5 +1,10 @@
+-import registerRootComponent from 'expo/src/launch/registerRootComponent';
++// FormData polyfill must run before expo/winter loads — bare 'FormData' throws
++// ReferenceError on Hermes in Expo Go SDK 54 + New Architecture before RN initializes it.
++if (typeof global.FormData === 'undefined') {
++  global.FormData = require('react-native/Libraries/Network/FormData').default;
++}
+ 
+-import App from '../../App';
++const registerRootComponent = require('expo/src/launch/registerRootComponent').default;
++const App = require('../../App').default;
+ 
+ registerRootComponent(App);
 diff --git a/node_modules/expo/src/winter/runtime.native.ts b/node_modules/expo/src/winter/runtime.native.ts
 index 2d9b4fa..d54b2ee 100644
 --- a/node_modules/expo/src/winter/runtime.native.ts

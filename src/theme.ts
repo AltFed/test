@@ -52,8 +52,17 @@ export function useColors(): AppColors {
 
 export const colors = darkColors;
 
+function monoFonts(base: typeof MD3DarkTheme) {
+  const result: Record<string, object> = {};
+  for (const key of Object.keys(base.fonts)) {
+    result[key] = { ...(base.fonts as Record<string, object>)[key], fontFamily: fonts.mono };
+  }
+  return result as typeof base.fonts;
+}
+
 const darkPaper = {
   ...MD3DarkTheme,
+  fonts: monoFonts(MD3DarkTheme),
   colors: {
     ...MD3DarkTheme.colors,
     primary: darkColors.accent,
@@ -70,6 +79,7 @@ const darkPaper = {
 
 const lightPaper = {
   ...MD3LightTheme,
+  fonts: monoFonts(MD3LightTheme),
   colors: {
     ...MD3LightTheme.colors,
     primary: lightColors.accent,

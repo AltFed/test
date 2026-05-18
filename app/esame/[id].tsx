@@ -209,7 +209,7 @@ export default function EsameDetail() {
           ) : null}
 
           {moduli.map((m) => (
-            <SwipeableRow key={m.id} onDelete={() => { deleteModulo(m.id); load(); }} bottomGap={0}>
+            <SwipeableRow key={m.id} onDelete={() => { deleteModulo(m.id); load(); }}>
               <TouchableOpacity
                 style={[s.moduloRow, { borderBottomColor: C.border }]}
                 onPress={() => { toggleModulo(m.id, m.completato ? 0 : 1); load(); }}
@@ -263,7 +263,7 @@ export default function EsameDetail() {
           ) : null}
 
           {lezioni.map((l) => (
-            <SwipeableRow key={l.id} onDelete={() => { deleteLezione(l.id); load(); }} bottomGap={0}>
+            <SwipeableRow key={l.id} onDelete={() => { deleteLezione(l.id); load(); }}>
               <View style={[s.lezioneRow, { borderBottomColor: C.border, borderLeftColor: l.colore }]}>
                 <View style={s.lezioneOrario}>
                   <Text style={[s.lezOra, { color: l.colore, fontFamily: fonts.dot }]}>

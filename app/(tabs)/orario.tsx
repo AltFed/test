@@ -62,9 +62,16 @@ export default function OrarioScreen() {
                 <SwipeableRow
                   key={l.id}
                   onDelete={() => { deleteLezione(l.id); load(); }}
-                  bottomGap={8}
+                  style={{
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    borderLeftWidth: 3,
+                    borderColor: C.border,
+                    borderLeftColor: l.colore,
+                    marginBottom: 8,
+                  }}
                 >
-                  <View style={[s.card, { backgroundColor: C.card, borderColor: C.border, borderLeftColor: l.colore }]}>
+                  <View style={[s.card, { backgroundColor: C.card }]}>
                     <View style={s.orarioCol}>
                       <Text style={[s.ora, { color: l.colore, fontFamily: fonts.dot }]}>
                         {l.ora_inizio}
@@ -113,10 +120,6 @@ const s = StyleSheet.create({
   giornoSection: { marginBottom: 24 },
   giornoLabel: { fontSize: 10, letterSpacing: 2, marginBottom: 8 },
   card: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderLeftWidth: 3,
-    marginBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,

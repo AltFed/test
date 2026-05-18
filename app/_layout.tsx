@@ -42,11 +42,12 @@ export default function RootLayout() {
               contentStyle: { backgroundColor: C.background },
               headerShadowVisible: false,
               headerTitleStyle: { fontFamily: fonts.mono, fontSize: 15 },
+              headerBackButtonDisplayMode: 'minimal',
             }}
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="esame/[id]" options={{ title: 'Dettaglio Esame', headerBackTitle: '' }} />
-            <Stack.Screen name="impostazioni" options={{ title: 'Impostazioni', headerBackTitle: '' }} />
+            <Stack.Screen name="esame/[id]" options={{ title: 'Dettaglio Esame' }} />
+            <Stack.Screen name="impostazioni" options={{ title: 'Impostazioni' }} />
             <Stack.Screen name="+not-found" />
           </Stack>
         </PaperProvider>

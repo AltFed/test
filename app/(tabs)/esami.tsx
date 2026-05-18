@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { Text, Portal, Dialog, Button, TextInput } from 'react-native-paper';
 import { useFocusEffect, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -115,9 +115,20 @@ export default function EsamiScreen() {
           const accent = accentForIndex(index);
           const ore = oreMap[esame.id] ?? 0;
           return (
-            <SwipeableRow key={esame.id} onDelete={() => { deleteEsame(esame.id); load(); }} bottomGap={10}>
+            <SwipeableRow
+              key={esame.id}
+              onDelete={() => { deleteEsame(esame.id); load(); }}
+              style={{
+                borderRadius: 16,
+                borderWidth: 1,
+                borderLeftWidth: 3,
+                borderColor: C.border,
+                borderLeftColor: accent,
+                marginBottom: 10,
+              }}
+            >
               <TouchableOpacity
-                style={[s.card, { backgroundColor: C.card, borderColor: C.border, borderLeftColor: accent }]}
+                style={[s.card, { backgroundColor: C.card }]}
                 onPress={() => router.push(`/esame/${esame.id}`)}
                 activeOpacity={0.7}
               >
@@ -182,6 +193,7 @@ export default function EsamiScreen() {
           onDismiss={() => setDialogVisible(false)}
           style={[s.dialog, { backgroundColor: C.surface }]}
         >
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <Dialog.Title style={[s.dialogTitle, { color: C.textPrimary, fontFamily: fonts.mono }]}>
             Nuovo Esame
           </Dialog.Title>
@@ -260,6 +272,7 @@ export default function EsamiScreen() {
               Aggiungi
             </Button>
           </Dialog.Actions>
+          </KeyboardAvoidingView>
         </Dialog>
       </Portal>
     </SafeAreaView>
@@ -283,9 +296,6 @@ const s = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 100, gap: 10 },
   empty: { textAlign: 'center', marginTop: 40, fontSize: 13, lineHeight: 20 },
   card: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderLeftWidth: 3,
     padding: 14,
   },
   cardMain: { flexDirection: 'row', alignItems: 'center', gap: 12 },

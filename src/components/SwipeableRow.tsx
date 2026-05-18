@@ -1,51 +1,53 @@
 import React, { useRef } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface Props {
   children: React.ReactNode;
   onDelete: () => void;
-  bottomGap?: number;
+  style?: ViewStyle;
 }
 
-export function SwipeableRow({ children, onDelete, bottomGap = 10 }: Props) {
+export function SwipeableRow({ children, onDelete, style }: Props) {
   const ref = useRef<Swipeable>(null);
 
   function renderRightAction() {
     return (
-      <View style={[styles.action, { marginBottom: bottomGap }]}>
+      <View style={s.action}>
         <MaterialCommunityIcons name="trash-can-outline" size={22} color="#FFFFFF" />
-        <Text style={styles.label}>ELIMINA</Text>
+        <Text style={s.label}>ELIMINA</Text>
       </View>
     );
   }
 
   return (
-    <Swipeable
-      ref={ref}
-      friction={2}
-      rightThreshold={80}
-      renderRightActions={renderRightAction}
-      onSwipeableOpen={(direction) => {
-        if (direction === 'right') onDelete();
-      }}
-      overshootRight={false}
-    >
-      {children}
-    </Swipeable>
+    <View style={[s.outer, style]}>
+      <Swipeable
+        ref={ref}
+        friction={1.5}
+        rightThreshold={60}
+        renderRightActions={renderRightAction}
+        onSwipeableOpen={(direction) => {
+          if (direction === 'right') onDelete();
+        }}
+        overshootRight={false}
+      >
+        {children}
+      </Swipeable>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
+  outer: { overflow: 'hidden' },
   action: {
     backgroundColor: '#FF3B30',
     width: 88,
     justifyContent: 'center',
     alignItems: 'center',
-    borderTopRightRadius: 16,
-    borderBottomRightRadius: 16,
     gap: 4,
+    flex: 1,
   },
   label: {
     color: '#FFFFFF',

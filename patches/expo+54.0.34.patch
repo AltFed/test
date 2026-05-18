@@ -1,0 +1,17 @@
+diff --git a/node_modules/expo/src/winter/runtime.native.ts b/node_modules/expo/src/winter/runtime.native.ts
+index 2d9b4fa..d54b2ee 100644
+--- a/node_modules/expo/src/winter/runtime.native.ts
++++ b/node_modules/expo/src/winter/runtime.native.ts
+@@ -22,7 +22,11 @@ install('__ExpoImportMetaRegistry', () => require('./ImportMetaRegistry').Import
+ // https://html.spec.whatwg.org/multipage/structured-data.html#structuredclone
+ install('structuredClone', () => require('@ungap/structured-clone').default);
+ 
+-installFormDataPatch(FormData);
++// Expo Go SDK 54 + RN 0.81 New Architecture: FormData may not be in global scope yet.
++// Use global.FormData to avoid ReferenceError on Hermes.
++if (typeof (global as any).FormData !== 'undefined') {
++  installFormDataPatch((global as any).FormData);
++}
+ 
+ // Polyfill async iterator symbol for Hermes.
+ // @ts-expect-error: readonly property only applies when the engine supports it

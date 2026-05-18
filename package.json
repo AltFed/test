@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "postinstall": "patch-package",
+    "postinstall": "node scripts/patch-expo.js",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -23,7 +23,6 @@
     "babel-preset-expo": "~54.0.10",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~9.0.0",
-    "patch-package": "^8.0.1",
     "typescript": "~5.7.0"
   },
   "private": true

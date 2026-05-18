@@ -1,8 +1,9 @@
 {
   "expo": {
-    "name": "HelloWorldApp",
-    "slug": "hello-world-app",
+    "name": "UniVersal",
+    "slug": "universal",
     "version": "1.0.0",
+    "scheme": "universal",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -10,25 +11,28 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0f0f0f"
+      "backgroundColor": "#0D0D0D"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.yourname.helloworldapp",
+      "bundleIdentifier": "com.yourname.universal",
       "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0f0f0f"
+        "backgroundColor": "#0D0D0D"
       },
-      "package": "com.yourname.helloworldapp",
+      "package": "com.yourname.universal",
       "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "plugins": []
+    "plugins": [
+      "expo-router",
+      "expo-sqlite"
+    ]
   }
 }

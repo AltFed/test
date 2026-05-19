@@ -48,6 +48,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="esame/[id]" options={{ title: 'Dettaglio Esame' }} />
             <Stack.Screen name="impostazioni" options={{ title: 'Impostazioni' }} />
+            <Stack.Screen name="import" options={{ title: 'Importa Storico' }} />
             <Stack.Screen name="+not-found" />
           </Stack>
         </PaperProvider>

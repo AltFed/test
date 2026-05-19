@@ -8,7 +8,7 @@
 - branch: `claude/setup-expo-typescript-project-Kxow7`
 - git user: AltFed
 - last_updated: 2026-05-19
-- last_commit: Block 3 — OGGI timeline in orario, Flashcard mode in studio
+- last_commit: fix dialog keyboard + import storico screen
 
 ---
 
@@ -40,6 +40,7 @@ app/
     studio.tsx             pomodoro — FatigueRing, MorningCheckIn, CooldownSheet, amber
     simulatore.tsx         grade simulator — delta row, VT323 nums
   esame/[id].tsx           exam detail — moduli, lezioni, sessioni, voto
+  import.tsx               batch import past exams — grade grid 18-30/30L, immediate insert
   impostazioni.tsx         settings screen
 
 src/
@@ -178,8 +179,18 @@ Sessions display: "X / budget"
 ### esami.tsx
 - Filter pills: tutti/da_fare/superati
 - Accent colors: ACCENTS array, accentForIndex(i) cycles through 6 colors
-- FAB opens dialog: nome(req), professore(opt), cfu(req), tipo pill, oreTarget(if tirocinio)
+- Header right: STORICO button → router.push('/import')
+- FAB opens dialog: NO KeyboardAvoidingView, NO Dialog.Actions
+  - Custom dialogHeader row inside Dialog.Content: [Annulla text] [title] [✓ icon]
+  - ✓ enabled when nome.trim() && cfu.trim(); chiudiDialog() resets all fields
 - voto_finale===33 displays as '30L'
+
+### import.tsx
+- Stack header right: ✓ icon (dynamic, enabled when canAdd)
+- Grade grid: [18-23][24-29][30,30L(=33)] — tap to select, pill style
+- Inserts immediately: insertEsame() + updateEsameVoto() on each aggiungi
+- Added list shown below with ✕ to undo (deleteEsame)
+- canAdd = nome && cfu && voto selected
 
 ### orario.tsx
 - OGGI section at top: today's lessons with ORA/PROX badges, past lessons dimmed (opacity 0.45)
@@ -225,6 +236,9 @@ Sessions display: "X / budget"
 7. headerBackButtonDisplayMode:'minimal' in Stack screenOptions → arrow only, no text
 
 8. expo-blur BlurView: iOS=real blur, Android=colored overlay (tint+backgroundColor fallback)
+
+9. Dialog keyboard fix pattern: remove Dialog.Title + Dialog.Actions + KeyboardAvoidingView.
+   Put custom header row [Annulla | title | ✓] at top of Dialog.Content. ✓ always visible.
 ```
 
 ---

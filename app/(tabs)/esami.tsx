@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, Portal, Dialog, Button, TextInput } from 'react-native-paper';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text, Portal, Dialog, TextInput } from 'react-native-paper';
 import { useFocusEffect, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -52,6 +52,11 @@ export default function EsamiScreen() {
     return true;
   });
 
+  function chiudiDialog() {
+    setDialogVisible(false);
+    setNome(''); setProfessore(''); setCfu(''); setTipo('voto'); setOreTarget('');
+  }
+
   function salvaEsame() {
     if (!nome.trim() || !cfu.trim()) return;
     insertEsame(
@@ -61,8 +66,7 @@ export default function EsamiScreen() {
       professore.trim() || undefined,
       tipo === 'tirocinio' && oreTarget ? parseInt(oreTarget, 10) : undefined
     );
-    setNome(''); setProfessore(''); setCfu(''); setTipo('voto'); setOreTarget('');
-    setDialogVisible(false);
+    chiudiDialog();
     load();
   }
 
@@ -76,6 +80,14 @@ export default function EsamiScreen() {
             {esami.filter((e) => e.superato).length}/{esami.length} superati
           </Text>
         </View>
+        <TouchableOpacity
+          style={[s.importBtn, { borderColor: C.border }]}
+          onPress={() => router.push('/import')}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="database-import-outline" size={18} color={C.textSecondary} />
+          <Text style={[s.importLabel, { color: C.textSecondary, fontFamily: fonts.mono }]}>STORICO</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Filter pills */}
@@ -190,14 +202,28 @@ export default function EsamiScreen() {
       <Portal>
         <Dialog
           visible={dialogVisible}
-          onDismiss={() => setDialogVisible(false)}
+          onDismiss={chiudiDialog}
           style={[s.dialog, { backgroundColor: C.surface }]}
         >
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <Dialog.Title style={[s.dialogTitle, { color: C.textPrimary, fontFamily: fonts.mono }]}>
-            Nuovo Esame
-          </Dialog.Title>
           <Dialog.Content style={s.dialogContent}>
+            {/* Header row — always above keyboard */}
+            <View style={s.dialogHeader}>
+              <TouchableOpacity onPress={chiudiDialog} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Text style={[s.dialogCancel, { color: C.textSecondary, fontFamily: fonts.mono }]}>Annulla</Text>
+              </TouchableOpacity>
+              <Text style={[s.dialogTitleText, { color: C.textPrimary, fontFamily: fonts.mono }]}>Nuovo Esame</Text>
+              <TouchableOpacity
+                onPress={salvaEsame}
+                disabled={!nome.trim() || !cfu.trim()}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <MaterialCommunityIcons
+                  name="check"
+                  size={22}
+                  color={nome.trim() && cfu.trim() ? C.accent : C.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
             <TextInput
               label="Nome esame"
               value={nome}
@@ -206,7 +232,7 @@ export default function EsamiScreen() {
               outlineColor={C.border}
               activeOutlineColor={C.accent}
               textColor={C.textPrimary}
-              style={[s.input, { backgroundColor: C.card }]}
+              style={{ backgroundColor: C.card }}
             />
             <TextInput
               label="Professore (opzionale)"
@@ -216,7 +242,7 @@ export default function EsamiScreen() {
               outlineColor={C.border}
               activeOutlineColor={C.accent}
               textColor={C.textPrimary}
-              style={[s.input, { backgroundColor: C.card }]}
+              style={{ backgroundColor: C.card }}
             />
             <TextInput
               label="CFU"
@@ -227,7 +253,7 @@ export default function EsamiScreen() {
               outlineColor={C.border}
               activeOutlineColor={C.accent}
               textColor={C.textPrimary}
-              style={[s.input, { backgroundColor: C.card }]}
+              style={{ backgroundColor: C.card }}
             />
             <View style={s.tipoRow}>
               {(['voto', 'tirocinio'] as const).map((t) => (
@@ -256,23 +282,10 @@ export default function EsamiScreen() {
                 outlineColor={C.border}
                 activeOutlineColor={C.accent}
                 textColor={C.textPrimary}
-                style={[s.input, { backgroundColor: C.card }]}
+                style={{ backgroundColor: C.card }}
               />
             ) : null}
           </Dialog.Content>
-          <Dialog.Actions>
-            <Button textColor={C.textSecondary} onPress={() => setDialogVisible(false)}>Annulla</Button>
-            <Button
-              mode="contained"
-              onPress={salvaEsame}
-              disabled={!nome.trim() || !cfu.trim()}
-              buttonColor={C.accent}
-              textColor="#000000"
-            >
-              Aggiungi
-            </Button>
-          </Dialog.Actions>
-          </KeyboardAvoidingView>
         </Dialog>
       </Portal>
     </SafeAreaView>
@@ -281,9 +294,11 @@ export default function EsamiScreen() {
 
 const s = StyleSheet.create({
   safe: { flex: 1 },
-  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
+  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   title: { fontSize: 36, lineHeight: 38 },
   subtitle: { fontSize: 12, marginTop: 2 },
+  importBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, borderWidth: 1, marginBottom: 2 },
+  importLabel: { fontSize: 10, letterSpacing: 0.5 },
   filterRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 8 },
   filterPill: {
     paddingHorizontal: 12,
@@ -318,9 +333,10 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   dialog: { borderRadius: 20 },
-  dialogTitle: { fontSize: 18 },
+  dialogHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 4 },
+  dialogCancel: { fontSize: 13 },
+  dialogTitleText: { fontSize: 16, fontWeight: '700' },
   dialogContent: { gap: 12 },
-  input: {},
   tipoRow: { flexDirection: 'row', gap: 8 },
   tipoPill: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, alignItems: 'center' },
   tipoPillText: { fontSize: 11, letterSpacing: 0.3 },

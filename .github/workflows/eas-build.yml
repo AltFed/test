@@ -28,7 +28,7 @@ jobs:
 
       - name: Generate placeholder PNG assets (source files are invalid)
         run: |
-          pip3 install Pillow --quiet
+          pip3 install Pillow --quiet --break-system-packages
           python3 - << 'PYEOF'
           from PIL import Image, ImageDraw
           import os

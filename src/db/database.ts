@@ -169,6 +169,14 @@ export function getSessioniRecenti(esameId: number): SessioneStudio[] {
   );
 }
 
+export function getSessioniOggiTotali(): number {
+  const today = new Date().toISOString().slice(0, 10);
+  return db().getFirstSync<{ cnt: number }>(
+    "SELECT COUNT(*) as cnt FROM sessioni_studio WHERE substr(data, 1, 10) = ?",
+    today
+  )?.cnt ?? 0;
+}
+
 // --- Lezioni ---
 
 export function getAllLezioniConEsame(): LezioneConEsame[] {

@@ -1,20 +1,27 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, Portal, Dialog, Button, Menu } from 'react-native-paper';
+import { Text, Menu } from 'react-native-paper';
 import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors, fonts } from '@/theme';
+import { FatigueRing } from '@/components/FatigueRing';
+import { MorningCheckIn } from '@/components/MorningCheckIn';
+import { CooldownSheet } from '@/components/CooldownSheet';
 import {
   getAllEsami,
   insertSessione,
   getOreStudiate,
   getSessioniRecenti,
+  getSessioniOggiTotali,
+  getSetting,
+  setSetting,
 } from '@/db/database';
 import type { Esame, SessioneStudio } from '@/db/types';
 
 const POMODORO_LAVORO = 25 * 60;
 const POMODORO_PAUSA = 5 * 60;
+const AMBER = '#CC8800';
 
 type Fase = 'lavoro' | 'pausa';
 
@@ -30,6 +37,10 @@ function formatData(iso: string): string {
   });
 }
 
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export default function StudioScreen() {
   const C = useColors();
   const [esami, setEsami] = useState<Esame[]>([]);
@@ -38,7 +49,10 @@ export default function StudioScreen() {
   const [fase, setFase] = useState<Fase>('lavoro');
   const [secondi, setSecondi] = useState(POMODORO_LAVORO);
   const [running, setRunning] = useState(false);
-  const [sessioni, setSessioni] = useState(0);
+  const [sessioniOggi, setSessioniOggi] = useState(0);
+  const [budget, setBudget] = useState(6);
+  const [showCheckIn, setShowCheckIn] = useState(false);
+  const [showCooldown, setShowCooldown] = useState(false);
   const [sessioniRecenti, setSessioniRecenti] = useState<SessioneStudio[]>([]);
   const [oreTotali, setOreTotali] = useState(0);
   const [roi, setRoi] = useState<{ ore: number; orePerCfu: number } | null>(null);
@@ -51,7 +65,19 @@ export default function StudioScreen() {
     useCallback(() => {
       const list = getAllEsami();
       setEsami(list);
+
+      const oggi = todayStr();
+      const ultimaCheckin = getSetting('ultima_checkin');
+      setShowCheckIn(ultimaCheckin !== oggi);
+
+      const storedBudget = getSetting('budget_odierno');
+      if (storedBudget) setBudget(parseInt(storedBudget, 10));
+
+      const cnt = getSessioniOggiTotali();
+      setSessioniOggi(cnt);
+
       if (selectedId !== null) refreshStats(selectedId, list);
+
       return () => {
         if (intervalRef.current) clearInterval(intervalRef.current);
         setRunning(false);
@@ -70,6 +96,14 @@ export default function StudioScreen() {
     } else {
       setRoi(null);
     }
+  }
+
+  function handleCheckIn(b: number) {
+    const oggi = todayStr();
+    setSetting('ultima_checkin', oggi);
+    setSetting('budget_odierno', String(b));
+    setBudget(b);
+    setShowCheckIn(false);
   }
 
   function seleziona(id: number) {
@@ -95,9 +129,18 @@ export default function StudioScreen() {
       baseSecondiRef.current = secondi;
       setRunning(false);
     } else {
-      startRef.current = Date.now();
-      setRunning(true);
+      if (fase === 'lavoro' && sessioniOggi >= budget) {
+        setShowCooldown(true);
+        return;
+      }
+      actuallyStart();
     }
+  }
+
+  function actuallyStart() {
+    setShowCooldown(false);
+    startRef.current = Date.now();
+    setRunning(true);
   }
 
   useEffect(() => {
@@ -111,7 +154,8 @@ export default function StudioScreen() {
         if (fase === 'lavoro') {
           if (selectedId) {
             insertSessione(selectedId, 25);
-            setSessioni((s) => s + 1);
+            const cnt = getSessioniOggiTotali();
+            setSessioniOggi(cnt);
             refreshStats(selectedId);
           }
           setFase('pausa');
@@ -132,12 +176,16 @@ export default function StudioScreen() {
   const esameSelezionato = esami.find((e) => e.id === selectedId);
   const durata = fase === 'lavoro' ? POMODORO_LAVORO : POMODORO_PAUSA;
   const progress = 1 - secondi / durata;
-  const faseColor = fase === 'lavoro' ? C.accent : C.success;
+  const isOverBudget = sessioniOggi >= budget;
+  const activeColor = isOverBudget ? AMBER : C.accent;
+  const faseColor = fase === 'lavoro' ? activeColor : C.success;
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: C.background }]} edges={['top']}>
       <ScrollView contentContainerStyle={s.content}>
         <Text style={[s.title, { color: C.textPrimary, fontFamily: fonts.dot }]}>Studio</Text>
+
+        {showCheckIn && <MorningCheckIn onConfirm={handleCheckIn} />}
 
         {/* Exam selector */}
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
@@ -169,15 +217,22 @@ export default function StudioScreen() {
           </Menu>
         </View>
 
-        {/* Timer */}
-        <View style={[s.card, s.timerCard, { backgroundColor: C.card, borderColor: C.border }]}>
-          <Text style={[s.faseLabel, { color: C.textMuted, fontFamily: fonts.mono }]}>
-            {fase === 'lavoro' ? 'SESSIONE FOCUS' : 'PAUSA'}
+        {/* Timer card */}
+        <View style={[s.card, s.timerCard, { backgroundColor: C.card, borderColor: isOverBudget ? AMBER + '55' : C.border }]}>
+          <Text style={[s.faseLabel, { color: isOverBudget ? AMBER : C.textMuted, fontFamily: fonts.mono }]}>
+            {fase === 'lavoro' ? (isOverBudget ? 'OVER BUDGET' : 'SESSIONE FOCUS') : 'PAUSA'}
           </Text>
 
-          <Text style={[s.timerNum, { color: faseColor, fontFamily: fonts.dot }]}>
-            {formatTime(secondi)}
-          </Text>
+          <FatigueRing
+            total={budget}
+            completed={sessioniOggi}
+            activeColor={activeColor}
+            dimColor={C.border}
+          >
+            <Text style={[s.timerNum, { color: faseColor, fontFamily: fonts.dot }]}>
+              {formatTime(secondi)}
+            </Text>
+          </FatigueRing>
 
           {/* Progress track */}
           <View style={[s.progressTrack, { backgroundColor: C.border }]}>
@@ -187,10 +242,7 @@ export default function StudioScreen() {
           {/* Buttons */}
           <View style={s.timerBtns}>
             <TouchableOpacity
-              style={[
-                s.playBtn,
-                { backgroundColor: selectedId ? faseColor : C.border },
-              ]}
+              style={[s.playBtn, { backgroundColor: selectedId ? faseColor : C.border }]}
               onPress={startStop}
               disabled={!selectedId}
               activeOpacity={0.85}
@@ -213,9 +265,12 @@ export default function StudioScreen() {
           </View>
 
           <Text style={[s.sessioniCount, { color: C.textMuted, fontFamily: fonts.mono }]}>
-            Sessioni oggi:{' '}
+            {'Sessioni oggi: '}
             <Text style={[s.sessioniCount, { color: faseColor, fontFamily: fonts.dot }]}>
-              {String(sessioni)}
+              {String(sessioniOggi)}
+            </Text>
+            <Text style={[s.sessioniCount, { color: C.textMuted, fontFamily: fonts.mono }]}>
+              {` / ${String(budget)}`}
             </Text>
           </Text>
         </View>
@@ -295,6 +350,12 @@ export default function StudioScreen() {
           </View>
         )}
       </ScrollView>
+
+      <CooldownSheet
+        visible={showCooldown}
+        onDismiss={() => setShowCooldown(false)}
+        onForceContinue={actuallyStart}
+      />
     </SafeAreaView>
   );
 }
@@ -317,7 +378,7 @@ const s = StyleSheet.create({
   },
   selectorText: { fontSize: 14, flex: 1 },
   faseLabel: { fontSize: 11, letterSpacing: 2 },
-  timerNum: { fontSize: 88, lineHeight: 88 },
+  timerNum: { fontSize: 80, lineHeight: 80 },
   progressTrack: { width: '100%', height: 2, borderRadius: 1, overflow: 'hidden' },
   progressFill: { height: '100%' },
   timerBtns: { flexDirection: 'row', gap: 12, alignItems: 'center' },

@@ -29,7 +29,7 @@ jobs:
       - name: Fix PNG assets (re-encode to fix CRC errors)
         run: |
           for f in assets/*.png; do
-            sips -s format png "$f" --out /tmp/fixed_asset.png && mv /tmp/fixed_asset.png "$f"
+            ffmpeg -y -i "$f" /tmp/fixed_asset.png 2>/dev/null && cp /tmp/fixed_asset.png "$f"
           done
 
       - name: Generate native iOS project

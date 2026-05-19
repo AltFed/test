@@ -34,6 +34,13 @@
       "expo-router",
       "expo-sqlite",
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "99b22670-fef7-467d-a8d8-4ff9d81e19c2"
+      }
+    },
+    "owner": "federosi01"
   }
 }

@@ -43,3 +43,11 @@ export interface LezioneConEsame extends Lezione {
   nome_esame: string;
   professore: string | null;
 }
+
+export interface Flashcard {
+  id: number;
+  esame_id: number;
+  fronte: string;
+  retro: string;
+  retro_foto: string | null;
+}

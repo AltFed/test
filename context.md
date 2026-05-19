@@ -8,7 +8,7 @@
 - branch: `claude/setup-expo-typescript-project-Kxow7`
 - git user: AltFed
 - last_updated: 2026-05-19
-- last_commit: e246a5e — feat: Block 2 FatigueRing+MorningCheckIn+CooldownSheet+amber
+- last_commit: Block 3 — OGGI timeline in orario, Flashcard mode in studio
 
 ---
 
@@ -52,6 +52,7 @@ src/
     FatigueRing.tsx        SVG arc ring — total/completed/activeColor/dimColor
     MorningCheckIn.tsx     daily energy check-in card — 1-5 dots → budget 4/6/8
     CooldownSheet.tsx      expo-blur bottom sheet — over-budget gate
+    FlashCard.tsx          single flashcard with 3D flip — front/back + photo support
 ```
 
 ---
@@ -86,6 +87,7 @@ esami(id PK, nome, cfu, tipo[voto|tirocinio], voto_finale, ore_tirocinio_target,
 moduli(id PK, esame_id FK→esami, nome, tipo[scritto|orale|progetto|ore], completato, ore_completate)
 sessioni_studio(id PK, esame_id FK→esami, durata_minuti, data ISO)
 lezioni(id PK, esame_id FK→esami, giorno[0=Lun..6=Dom], ora_inizio, ora_fine, aula, colore hex)
+flashcard(id PK, esame_id FK→esami, fronte TEXT, retro TEXT, retro_foto TEXT nullable)
 PRAGMA foreign_keys=ON  →  cascade deletes work
 ```
 
@@ -97,6 +99,7 @@ getModuli(esameId) / insertModulo / toggleModulo / deleteModulo
 insertSessione(esameId, minuti) / getOreStudiate(esameId) / getSessioniRecenti(esameId)
 getSessioniOggiTotali() → COUNT(*) WHERE substr(data,1,10)=today
 getAllLezioniConEsame() / getLezioniByEsame(esameId) / insertLezione / deleteLezione
+getFlashcard(esameId) / insertFlashcard(esameId, fronte, retro, retro_foto?) / deleteFlashcard(id)
 getMediaPonderata() / getCfuAcquisiti() / getEsamiSuperati()
 ```
 
@@ -179,9 +182,11 @@ Sessions display: "X / budget"
 - voto_finale===33 displays as '30L'
 
 ### orario.tsx
-- GIORNI[0..6] = Lun..Dom, groups by l.giorno
+- OGGI section at top: today's lessons with ORA/PROX badges, past lessons dimmed (opacity 0.45)
+  - jsGiornoToOur(jsDay) = (jsDay+6)%7 converts JS weekday to our 0=Mon..6=Sun format
+  - getLessonStatuses(): now/next/past/future based on current time vs ora_inizio/fine
+- Weekly section below: GIORNI[0..6] groups, today day dot in accent color
 - SwipeableRow with borderLeftColor=l.colore
-- info: ora_inizio↓ora_fine, nome_esame, professore, aula tag
 
 ### esame/[id].tsx
 - Sections: grade display, moduli checklist, lezioni orario, sessioni recenti
@@ -228,14 +233,17 @@ Sessions display: "X / budget"
 ```
 ✅ BLOCK 1 — Nothing aesthetic + swipe-delete + dark/light mode
 ✅ BLOCK 2 — FatigueRing + MorningCheckIn + CooldownSheet + amber mode
-⬜ BLOCK 3 — Timeline widget + Flashcard system
+✅ BLOCK 3 — OGGI timeline in orario + Flashcard mode in studio (foto support, 3D flip)
 ⬜ BLOCK 4 — Soundscape Mixer
 ```
 
-### BLOCK 3 (planned)
-- Timeline: daily/weekly view of lezioni from orario, color-coded
-- Flashcard: deck per esame, spaced repetition or simple flip cards
-- New screens or sections in existing tabs TBD
+### BLOCK 3 (done)
+- orario.tsx: OGGI section — today's lessons, ORA/PROX badges, past dimmed
+- studio.tsx: TIMER | FLASHCARD mode switcher (pill segment control)
+  - Flashcard: 3D flip, SO/RIPASSARE buttons, session score, shuffle, foto risposta
+  - Add dialog: fronte text, retro text, retro_foto via expo-image-picker
+  - expo-image-picker: requestMediaLibraryPermissionsAsync before launchImageLibraryAsync
+  - deck = shuffle(getFlashcard(esameId)), sessionDone when deckIndex+1>=deck.length
 
 ### BLOCK 4 (planned)
 - Soundscape mixer: ambient audio loops during pomodoro sessions

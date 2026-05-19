@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import type { Esame, Modulo, SessioneStudio, Lezione, LezioneConEsame } from './types';
+import type { Esame, Modulo, SessioneStudio, Lezione, LezioneConEsame, Flashcard } from './types';
 
 let _db: SQLite.SQLiteDatabase | null = null;
 
@@ -53,6 +53,15 @@ export function initDatabase(): void {
       ora_fine TEXT NOT NULL,
       aula TEXT NOT NULL,
       colore TEXT NOT NULL DEFAULT '#7C4DFF',
+      FOREIGN KEY (esame_id) REFERENCES esami(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS flashcard (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      esame_id INTEGER NOT NULL,
+      fronte TEXT NOT NULL,
+      retro TEXT NOT NULL DEFAULT '',
+      retro_foto TEXT,
       FOREIGN KEY (esame_id) REFERENCES esami(id) ON DELETE CASCADE
     );
   `);
@@ -236,4 +245,24 @@ export function getEsamiSuperati(): Esame[] {
   return db().getAllSync<Esame>(
     'SELECT * FROM esami WHERE superato = 1 ORDER BY created_at DESC'
   );
+}
+
+// --- Flashcard ---
+
+export function getFlashcard(esameId: number): Flashcard[] {
+  return db().getAllSync<Flashcard>(
+    'SELECT * FROM flashcard WHERE esame_id = ? ORDER BY id ASC',
+    esameId
+  );
+}
+
+export function insertFlashcard(esameId: number, fronte: string, retro: string, retro_foto?: string): void {
+  db().runSync(
+    'INSERT INTO flashcard (esame_id, fronte, retro, retro_foto) VALUES (?, ?, ?, ?)',
+    esameId, fronte, retro, retro_foto ?? null
+  );
+}
+
+export function deleteFlashcard(id: number): void {
+  db().runSync('DELETE FROM flashcard WHERE id = ?', id);
 }

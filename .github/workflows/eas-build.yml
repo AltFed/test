@@ -28,9 +28,15 @@ jobs:
 
       - name: Fix PNG assets (re-encode to fix CRC errors)
         run: |
-          for f in assets/*.png; do
-            ffmpeg -y -i "$f" /tmp/fixed_asset.png 2>/dev/null && cp /tmp/fixed_asset.png "$f"
-          done
+          pip3 install Pillow --quiet
+          python3 - << 'PYEOF'
+          import glob
+          from PIL import Image
+          for f in glob.glob('assets/*.png'):
+              img = Image.open(f).convert('RGBA')
+              img.save(f, 'PNG')
+              print(f'Fixed: {f}')
+          PYEOF
 
       - name: Generate native iOS project
         run: npx expo prebuild --platform ios --clean

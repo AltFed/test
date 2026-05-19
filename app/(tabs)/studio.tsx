@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Text, Menu, Portal, Dialog, Button, TextInput } from 'react-native-paper';
+import { SwipeableRow } from '@/components/SwipeableRow';
 import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -85,6 +86,8 @@ export default function StudioScreen() {
   const [newFronte, setNewFronte] = useState('');
   const [newRetro, setNewRetro] = useState('');
   const [newFoto, setNewFoto] = useState<string | null>(null);
+  const [managing, setManaging] = useState(false);
+  const [allCards, setAllCards] = useState<Flashcard[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -128,10 +131,16 @@ export default function StudioScreen() {
 
   function loadDeck(id: number) {
     const cards = getFlashcard(id);
+    setAllCards(cards);
     setDeck(shuffle(cards));
     setDeckIndex(0);
     setSessionSo(0);
     setSessionDone(false);
+  }
+
+  function eliminaFlashcard(id: number) {
+    deleteFlashcard(id);
+    if (selectedId !== null) loadDeck(selectedId);
   }
 
   function handleCheckIn(b: number) {
@@ -433,7 +442,52 @@ export default function StudioScreen() {
         {/* ══════════ FLASHCARD MODE ══════════ */}
         {mode === 'flashcard' && (
           <>
-            {!selectedId ? (
+            {selectedId !== null && allCards.length > 0 && (
+              <View style={s.fcHeader}>
+                <Text style={[s.fcCount, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                  {String(allCards.length)} {allCards.length === 1 ? 'CARTA' : 'CARTE'}
+                </Text>
+                <TouchableOpacity
+                  style={[s.manageBtn, { borderColor: managing ? C.accent : C.border }]}
+                  onPress={() => setManaging((v) => !v)}
+                  activeOpacity={0.7}
+                >
+                  <MaterialCommunityIcons
+                    name={managing ? 'check' : 'pencil-outline'}
+                    size={13}
+                    color={managing ? C.accent : C.textSecondary}
+                  />
+                  <Text style={[s.manageBtnText, { color: managing ? C.accent : C.textSecondary, fontFamily: fonts.mono }]}>
+                    {managing ? 'FATTO' : 'GESTISCI'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {managing && selectedId !== null ? (
+              <View style={[s.card, { backgroundColor: C.card, borderColor: C.border, padding: 0, overflow: 'hidden' }]}>
+                {allCards.map((card, i) => (
+                  <SwipeableRow
+                    key={card.id}
+                    onDelete={() => eliminaFlashcard(card.id)}
+                    style={{ borderBottomWidth: i < allCards.length - 1 ? StyleSheet.hairlineWidth : 0, borderBottomColor: C.border }}
+                  >
+                    <View style={[s.cardRow, { backgroundColor: C.card }]}>
+                      <Text style={[s.cardRowText, { color: C.textPrimary, fontFamily: fonts.mono }]} numberOfLines={2}>
+                        {card.fronte}
+                      </Text>
+                      {card.retro_foto ? (
+                        <MaterialCommunityIcons name="image-outline" size={16} color={C.textMuted} />
+                      ) : card.retro ? (
+                        <Text style={[s.cardRowRetro, { color: C.textMuted, fontFamily: fonts.mono }]} numberOfLines={1}>
+                          {card.retro}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </SwipeableRow>
+                ))}
+              </View>
+            ) : !selectedId ? (
               <View style={s.emptyBox}>
                 <Text style={[s.emptyNum, { color: C.accent, fontFamily: fonts.dot }]}>00</Text>
                 <Text style={[s.emptyHint, { color: C.textMuted, fontFamily: fonts.mono }]}>
@@ -478,6 +532,7 @@ export default function StudioScreen() {
               />
             )}
           </>
+
         )}
       </ScrollView>
 
@@ -662,4 +717,12 @@ const s = StyleSheet.create({
     borderWidth: 1,
   },
   fotoBtnText: { flex: 1, fontSize: 13 },
+  // Flashcard manage
+  fcHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 2 },
+  fcCount: { fontSize: 10, letterSpacing: 2 },
+  manageBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+  manageBtnText: { fontSize: 11, letterSpacing: 0.5 },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
+  cardRowText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  cardRowRetro: { fontSize: 12, maxWidth: 100 },
 });

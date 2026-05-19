@@ -23,6 +23,7 @@ import {
   getLezioniByEsame,
   insertLezione,
   deleteLezione,
+  getStudyHoursLast7Days,
 } from '@/db/database';
 import type { Esame, Modulo, Lezione } from '@/db/types';
 
@@ -50,6 +51,7 @@ export default function EsameDetail() {
   const [moduli, setModuli] = useState<Modulo[]>([]);
   const [lezioni, setLezioni] = useState<Lezione[]>([]);
   const [ore, setOre] = useState(0);
+  const [studyDays, setStudyDays] = useState<{ date: string; minutes: number }[]>([]);
 
   const [dialogModulo, setDialogModulo] = useState(false);
   const [nomeModulo, setNomeModulo] = useState('');
@@ -74,6 +76,7 @@ export default function EsameDetail() {
       setModuli(getModuli(esameId));
       setLezioni(getLezioniByEsame(esameId));
       setOre(getOreStudiate(esameId));
+      setStudyDays(getStudyHoursLast7Days(esameId));
     }
   }, [esameId]);
 
@@ -177,6 +180,40 @@ export default function EsameDetail() {
               ) : null}
             </View>
           ) : null}
+
+          {studyDays.length > 0 ? (() => {
+            const maxMin = Math.max(...studyDays.map((d) => d.minutes), 1);
+            const dayLabels = ['L', 'M', 'M', 'G', 'V', 'S', 'D'];
+            const last7 = Array.from({ length: 7 }, (_, i) => {
+              const d = new Date();
+              d.setDate(d.getDate() - (6 - i));
+              const key = d.toISOString().slice(0, 10);
+              const found = studyDays.find((s) => s.date === key);
+              return { key, minutes: found?.minutes ?? 0, label: dayLabels[(d.getDay() + 6) % 7] };
+            });
+            return (
+              <View style={[s.chartRow, { borderTopColor: C.border }]}>
+                {last7.map((day) => (
+                  <View key={day.key} style={s.chartCol}>
+                    <View style={s.barTrack}>
+                      <View
+                        style={[
+                          s.barFill,
+                          {
+                            height: `${Math.round((day.minutes / maxMin) * 100)}%` as any,
+                            backgroundColor: day.minutes > 0 ? C.accent : C.border,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={[s.barLabel, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                      {day.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            );
+          })() : null}
         </View>
 
         {/* Task / Moduli */}
@@ -604,4 +641,9 @@ const s = StyleSheet.create({
   giornoPill: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   giornoPillText: { fontSize: 12, letterSpacing: 0.5 },
   colorDot: { width: 30, height: 30, borderRadius: 15 },
+  chartRow: { flexDirection: 'row', gap: 4, marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, height: 56 },
+  chartCol: { flex: 1, alignItems: 'center', gap: 3 },
+  barTrack: { flex: 1, width: '100%', justifyContent: 'flex-end', borderRadius: 3, overflow: 'hidden' },
+  barFill: { width: '100%', borderRadius: 3, minHeight: 2 },
+  barLabel: { fontSize: 9, letterSpacing: 0.5 },
 });

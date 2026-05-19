@@ -5,7 +5,7 @@ import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors, fonts } from '@/theme';
-import { getEsamiSuperati, getMediaPonderata } from '@/db/database';
+import { getEsamiSuperati, getMediaPonderata, getAllEsami } from '@/db/database';
 import type { Esame } from '@/db/types';
 
 interface VotoIpotetico {
@@ -77,6 +77,11 @@ export default function SimulatoreScreen() {
     setIpotesi((prev) => [...prev, { id: Date.now().toString(), nome: '', cfu: '6', voto: '' }]);
   }
 
+  function caricaDaFare() {
+    const daFare = getAllEsami().filter((e) => !e.superato && e.tipo === 'voto');
+    setIpotesi(daFare.map((e) => ({ id: String(e.id), nome: e.nome, cfu: String(e.cfu), voto: '' })));
+  }
+
   function aggiornaIpotesi(id: string, field: keyof VotoIpotetico, val: string) {
     setIpotesi((prev) => prev.map((h) => (h.id === id ? { ...h, [field]: val } : h)));
   }
@@ -129,15 +134,26 @@ export default function SimulatoreScreen() {
             <Text style={[s.label, { color: C.textSecondary, fontFamily: fonts.mono }]}>
               SLIDING DOORS
             </Text>
-            <TouchableOpacity
-              style={[s.addBtn, { borderColor: C.accent }]}
-              onPress={aggiungiIpotesi}
-            >
-              <MaterialCommunityIcons name="plus" size={14} color={C.accent} />
-              <Text style={[s.addBtnText, { color: C.accent, fontFamily: fonts.mono }]}>
-                AGGIUNGI
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <TouchableOpacity
+                style={[s.addBtn, { borderColor: C.border }]}
+                onPress={caricaDaFare}
+              >
+                <MaterialCommunityIcons name="download-outline" size={14} color={C.textSecondary} />
+                <Text style={[s.addBtnText, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+                  DA FARE
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.addBtn, { borderColor: C.accent }]}
+                onPress={aggiungiIpotesi}
+              >
+                <MaterialCommunityIcons name="plus" size={14} color={C.accent} />
+                <Text style={[s.addBtnText, { color: C.accent, fontFamily: fonts.mono }]}>
+                  ADD
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {ipotesi.length === 0 && (

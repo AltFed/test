@@ -178,6 +178,18 @@ export function getSessioniRecenti(esameId: number): SessioneStudio[] {
   );
 }
 
+export function getStudyHoursLast7Days(esameId: number): { date: string; minutes: number }[] {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 6);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  return db().getAllSync<{ date: string; minutes: number }>(
+    `SELECT substr(data, 1, 10) as date, SUM(durata_minuti) as minutes
+     FROM sessioni_studio WHERE esame_id = ? AND substr(data, 1, 10) >= ?
+     GROUP BY substr(data, 1, 10) ORDER BY date ASC`,
+    esameId, cutoffStr
+  );
+}
+
 export function getSessioniOggiTotali(): number {
   const today = new Date().toISOString().slice(0, 10);
   return db().getFirstSync<{ cnt: number }>(
@@ -248,6 +260,12 @@ export function getEsamiSuperati(): Esame[] {
 }
 
 // --- Flashcard ---
+
+export function resetAllData(): void {
+  db().execSync(
+    'DELETE FROM flashcard; DELETE FROM sessioni_studio; DELETE FROM lezioni; DELETE FROM moduli; DELETE FROM esami;'
+  );
+}
 
 export function getFlashcard(esameId: number): Flashcard[] {
   return db().getAllSync<Flashcard>(

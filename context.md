@@ -8,7 +8,7 @@
 - branch: `claude/setup-expo-typescript-project-Kxow7`
 - git user: AltFed
 - last_updated: 2026-05-19
-- last_commit: fix dialog keyboard + import storico screen
+- last_commit: feat: stats strip, flashcard manage, bar chart, orario tap, settings + danger zone
 
 ---
 
@@ -99,15 +99,21 @@ getAllEsami() / getEsame(id) / insertEsame(...) / updateEsameVoto(id,voto) / del
 getModuli(esameId) / insertModulo / toggleModulo / deleteModulo
 insertSessione(esameId, minuti) / getOreStudiate(esameId) / getSessioniRecenti(esameId)
 getSessioniOggiTotali() → COUNT(*) WHERE substr(data,1,10)=today
+getStudyHoursLast7Days(esameId) → [{date:YYYY-MM-DD, minutes:number}] last 7 days grouped by day
 getAllLezioniConEsame() / getLezioniByEsame(esameId) / insertLezione / deleteLezione
 getFlashcard(esameId) / insertFlashcard(esameId, fronte, retro, retro_foto?) / deleteFlashcard(id)
 getMediaPonderata() / getCfuAcquisiti() / getEsamiSuperati()
+resetAllData() → DELETE flashcard, sessioni_studio, lezioni, moduli, esami (preserves impostazioni)
 ```
 
 ### SETTINGS KEYS
 ```
 ultima_checkin   → ISO date string YYYY-MM-DD (last MorningCheckIn completion)
 budget_odierno   → string number "4"|"6"|"8" (pomodoro budget for today)
+nome_studente    → student name (shown in impostazioni)
+corso_laurea     → degree program name
+cfu_totali       → total CFU for the degree (default "180"), used for progress bar in esami tab
+data_laurea      → graduation session date YYYY-MM-DD
 ```
 
 ---
@@ -198,19 +204,35 @@ Sessions display: "X / budget"
   - getLessonStatuses(): now/next/past/future based on current time vs ora_inizio/fine
 - Weekly section below: GIORNI[0..6] groups, today day dot in accent color
 - SwipeableRow with borderLeftColor=l.colore
+- Tapping any card → router.push(`/esame/${l.esame_id}`)
+  - OGGI: TouchableOpacity replaces the oggiCard View
+  - Weekly: TouchableOpacity wraps inner card inside SwipeableRow
 
 ### esame/[id].tsx
-- Sections: grade display, moduli checklist, lezioni orario, sessioni recenti
+- Sections: grade display (with 7-day bar chart if sessions exist), moduli checklist, lezioni orario, sessioni recenti
+- 7-day bar chart: View-based bars, 7 columns always shown, accent color for active days, C.border for empty days
+  - Uses getStudyHoursLast7Days(), builds last7 array with day letter labels (L/M/M/G/V/S/D)
+  - chartRow height:56, barTrack flex fills remaining space, barFill height as %
 - Custom checkbox: 22x22, borderRadius:6, borderWidth:1.5
 - Lezione add dialog: giorno picker, ora_inizio/fine, aula, colore selector
 - SwipeableRow on both moduli rows and lezioni rows
 
+### esami.tsx (updated)
+- Stats strip between header and filter pills: media ponderata (VT323), CFU progress bar, da fare count
+  - Data from: getMediaPonderata(), getCfuAcquisiti(), parseInt(getSetting('cfu_totali')?? '180')
+  - Loaded in useFocusEffect load()
+- Header right: STORICO → router.push('/import')
+- Dialog fix pattern applied (see RECURRING GOTCHAS #9)
+
 ### simulatore.tsx
 - Hypothetical grade simulator
+- "DA FARE" button: loads all non-superato voto exams as blank ipotesi (getAllEsami().filter(!superato && tipo=voto))
 - delta row with VT323 numbers, C.success/>0, C.destructive/<0
 
 ### impostazioni.tsx
-- Yellow save button, card layout
+- Cards: PROFILO (nome_studente, corso_laurea), PIANO DI STUDI (cfu_totali, data_laurea with preview)
+- Yellow save button → saves settings, navigates back after 700ms
+- DANGER ZONE: Alert.alert confirmation → resetAllData() (preserves impostazioni)
 
 ---
 
@@ -252,9 +274,10 @@ Sessions display: "X / budget"
 ```
 
 ### BLOCK 3 (done)
-- orario.tsx: OGGI section — today's lessons, ORA/PROX badges, past dimmed
+- orario.tsx: OGGI section — today's lessons, ORA/PROX badges, past dimmed; tap → esame detail
 - studio.tsx: TIMER | FLASHCARD mode switcher (pill segment control)
   - Flashcard: 3D flip, SO/RIPASSARE buttons, session score, shuffle, foto risposta
+  - GESTISCI mode: allCards list with SwipeableRow swipe-to-delete per card
   - Add dialog: fronte text, retro text, retro_foto via expo-image-picker
   - expo-image-picker: requestMediaLibraryPermissionsAsync before launchImageLibraryAsync
   - deck = shuffle(getFlashcard(esameId)), sessionDone when deckIndex+1>=deck.length

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text } from 'react-native-paper';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors, fonts } from '@/theme';
 import { SwipeableRow } from '@/components/SwipeableRow';
@@ -101,8 +101,10 @@ export default function OrarioScreen() {
                 const status = statuses.get(l.id) ?? 'future';
                 const isPast = status === 'past';
                 return (
-                  <View
+                  <TouchableOpacity
                     key={l.id}
+                    onPress={() => router.push(`/esame/${l.esame_id}`)}
+                    activeOpacity={0.7}
                     style={[
                       s.oggiCard,
                       {
@@ -144,7 +146,7 @@ export default function OrarioScreen() {
                         </Text>
                       </View>
                     )}
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
           </View>
@@ -196,7 +198,11 @@ export default function OrarioScreen() {
                     marginBottom: 8,
                   }}
                 >
-                  <View style={[s.card, { backgroundColor: C.card }]}>
+                  <TouchableOpacity
+                    style={[s.card, { backgroundColor: C.card }]}
+                    onPress={() => router.push(`/esame/${l.esame_id}`)}
+                    activeOpacity={0.7}
+                  >
                     <View style={s.orarioCol}>
                       <Text style={[s.ora, { color: l.colore, fontFamily: fonts.dot }]}>
                         {l.ora_inizio}
@@ -221,7 +227,7 @@ export default function OrarioScreen() {
                         </Text>
                       </View>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 </SwipeableRow>
               ))}
             </View>

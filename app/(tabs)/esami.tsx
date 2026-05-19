@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors, fonts } from '@/theme';
 import { SwipeableRow } from '@/components/SwipeableRow';
-import { getAllEsami, insertEsame, deleteEsame, getOreStudiate } from '@/db/database';
+import { getAllEsami, insertEsame, deleteEsame, getOreStudiate, getMediaPonderata, getCfuAcquisiti, getSetting } from '@/db/database';
 import type { Esame } from '@/db/types';
 
 type Filtro = 'tutti' | 'da_fare' | 'superati';
@@ -35,6 +35,9 @@ export default function EsamiScreen() {
   const [cfu, setCfu] = useState('');
   const [tipo, setTipo] = useState<'voto' | 'tirocinio'>('voto');
   const [oreTarget, setOreTarget] = useState('');
+  const [media, setMedia] = useState(0);
+  const [cfuAcquisiti, setCfuAcquisiti] = useState(0);
+  const [cfuTotali, setCfuTotali] = useState(180);
 
   const load = useCallback(() => {
     const list = getAllEsami();
@@ -42,6 +45,9 @@ export default function EsamiScreen() {
     const map: Record<number, number> = {};
     list.forEach((e) => { map[e.id] = getOreStudiate(e.id); });
     setOreMap(map);
+    setMedia(getMediaPonderata());
+    setCfuAcquisiti(getCfuAcquisiti());
+    setCfuTotali(parseInt(getSetting('cfu_totali') ?? '180', 10));
   }, []);
 
   useFocusEffect(load);
@@ -88,6 +94,38 @@ export default function EsamiScreen() {
           <MaterialCommunityIcons name="database-import-outline" size={18} color={C.textSecondary} />
           <Text style={[s.importLabel, { color: C.textSecondary, fontFamily: fonts.mono }]}>STORICO</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Stats strip */}
+      <View style={[s.statsStrip, { borderColor: C.border, borderTopColor: C.border }]}>
+        <View style={s.statItem}>
+          <Text style={[s.statNum, { color: C.accent, fontFamily: fonts.dot }]}>
+            {media > 0 ? media.toFixed(2) : '—'}
+          </Text>
+          <Text style={[s.statLabel, { color: C.textMuted, fontFamily: fonts.mono }]}>media</Text>
+        </View>
+        <View style={[s.statDivider, { backgroundColor: C.border }]} />
+        <View style={[s.statItem, { flex: 2 }]}>
+          <View style={s.cfuRow}>
+            <Text style={[s.statNum, { color: C.textPrimary, fontFamily: fonts.dot }]}>
+              {String(cfuAcquisiti)}
+            </Text>
+            <Text style={[s.statNum, { color: C.textMuted, fontFamily: fonts.dot }]}>
+              /{String(cfuTotali)}
+            </Text>
+          </View>
+          <View style={[s.cfuTrack, { backgroundColor: C.border }]}>
+            <View style={[s.cfuFill, { width: `${Math.min((cfuAcquisiti / cfuTotali) * 100, 100)}%` as any, backgroundColor: C.accent }]} />
+          </View>
+          <Text style={[s.statLabel, { color: C.textMuted, fontFamily: fonts.mono }]}>CFU</Text>
+        </View>
+        <View style={[s.statDivider, { backgroundColor: C.border }]} />
+        <View style={s.statItem}>
+          <Text style={[s.statNum, { color: C.textSecondary, fontFamily: fonts.dot }]}>
+            {String(esami.filter((e) => !e.superato).length)}
+          </Text>
+          <Text style={[s.statLabel, { color: C.textMuted, fontFamily: fonts.mono }]}>da fare</Text>
+        </View>
       </View>
 
       {/* Filter pills */}
@@ -299,6 +337,14 @@ const s = StyleSheet.create({
   subtitle: { fontSize: 12, marginTop: 2 },
   importBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, borderWidth: 1, marginBottom: 2 },
   importLabel: { fontSize: 10, letterSpacing: 0.5 },
+  statsStrip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, marginBottom: 4 },
+  statItem: { flex: 1, alignItems: 'center', gap: 2 },
+  statNum: { fontSize: 22, lineHeight: 24 },
+  statLabel: { fontSize: 9, letterSpacing: 1 },
+  statDivider: { width: 1, height: 32, marginHorizontal: 8 },
+  cfuRow: { flexDirection: 'row', alignItems: 'baseline', gap: 2 },
+  cfuTrack: { width: '80%', height: 2, borderRadius: 1, overflow: 'hidden', marginTop: 2 },
+  cfuFill: { height: '100%' },
   filterRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 8 },
   filterPill: {
     paddingHorizontal: 12,

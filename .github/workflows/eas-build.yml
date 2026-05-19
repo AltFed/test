@@ -26,6 +26,12 @@ jobs:
       - name: Install Expo CLI
         run: npm install -g expo-cli @expo/cli
 
+      - name: Fix PNG assets (re-encode to fix CRC errors)
+        run: |
+          for f in assets/*.png; do
+            sips -s format png "$f" --out "$f"
+          done
+
       - name: Generate native iOS project
         run: npx expo prebuild --platform ios --clean
 

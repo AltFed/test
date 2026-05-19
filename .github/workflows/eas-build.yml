@@ -26,16 +26,26 @@ jobs:
       - name: Install Expo CLI
         run: npm install -g expo-cli @expo/cli
 
-      - name: Fix PNG assets (re-encode to fix CRC errors)
+      - name: Generate placeholder PNG assets (source files are invalid)
         run: |
           pip3 install Pillow --quiet
           python3 - << 'PYEOF'
-          import glob
-          from PIL import Image
-          for f in glob.glob('assets/*.png'):
-              img = Image.open(f).convert('RGBA')
-              img.save(f, 'PNG')
-              print(f'Fixed: {f}')
+          from PIL import Image, ImageDraw
+          import os
+
+          def make_icon(path, size, bg=(17, 17, 17, 255), fg=(255, 230, 0, 255)):
+              img = Image.new('RGBA', (size, size), bg)
+              d = ImageDraw.Draw(img)
+              m = size // 8
+              d.ellipse([m, m, size - m, size - m], fill=fg)
+              os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
+              img.save(path, 'PNG')
+              print(f'Generated: {path} ({size}x{size})')
+
+          make_icon('assets/icon.png', 1024)
+          make_icon('assets/adaptive-icon.png', 1024)
+          make_icon('assets/splash-icon.png', 200)
+          make_icon('assets/favicon.png', 48)
           PYEOF
 
       - name: Generate native iOS project

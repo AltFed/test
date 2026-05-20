@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, Portal, Dialog, Button, Menu } from 'react-native-paper';
+import { Text, Portal, Dialog, Button, Menu, TextInput } from 'react-native-paper';
 import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -10,11 +10,13 @@ import {
   insertSessione,
   getOreStudiate,
   getSessioniRecenti,
+  getMinutiStudioOggi,
+  getSetting,
+  setSetting,
 } from '@/db/database';
 import type { Esame, SessioneStudio } from '@/db/types';
 
-const POMODORO_LAVORO = 25 * 60;
-const POMODORO_PAUSA = 5 * 60;
+const DEEP_WORK_LIMIT = 240;
 
 type Fase = 'lavoro' | 'pausa';
 
@@ -24,10 +26,27 @@ function formatTime(s: number): string {
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
+function formatMinuti(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  if (h === 0) return `${min}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
 function formatData(iso: string): string {
   return new Date(iso).toLocaleDateString('it-IT', {
     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
   });
+}
+
+function getBudgetCutoff(): string {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const resetTs = getSetting('deep_work_reset_ts');
+  return resetTs && resetTs > startOfToday.toISOString()
+    ? resetTs
+    : startOfToday.toISOString();
 }
 
 export default function StudioScreen() {
@@ -36,22 +55,51 @@ export default function StudioScreen() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [menuVisible, setMenuVisible] = useState(false);
   const [fase, setFase] = useState<Fase>('lavoro');
-  const [secondi, setSecondi] = useState(POMODORO_LAVORO);
+  const [secondi, setSecondi] = useState(25 * 60);
   const [running, setRunning] = useState(false);
   const [sessioni, setSessioni] = useState(0);
   const [sessioniRecenti, setSessioniRecenti] = useState<SessioneStudio[]>([]);
   const [oreTotali, setOreTotali] = useState(0);
   const [roi, setRoi] = useState<{ ore: number; orePerCfu: number } | null>(null);
+  const [minutiOggi, setMinutiOggi] = useState(0);
+  const [lavoroMin, setLavoroMin] = useState(25);
+  const [pausaMin, setPausaMin] = useState(5);
+  const [showManifesto, setShowManifesto] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settLavoroStr, setSettLavoroStr] = useState('25');
+  const [settPausaStr, setSettPausaStr] = useState('5');
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startRef = useRef<number>(0);
-  const baseSecondiRef = useRef<number>(POMODORO_LAVORO);
+  const baseSecondiRef = useRef<number>(25 * 60);
+
+  const shallowMode = minutiOggi >= DEEP_WORK_LIMIT;
 
   useFocusEffect(
     useCallback(() => {
       const list = getAllEsami();
       setEsami(list);
+
+      const lav = parseInt(getSetting('pomodoro_lavoro') ?? '25', 10);
+      const pau = parseInt(getSetting('pomodoro_pausa') ?? '5', 10);
+      setLavoroMin(lav);
+      setPausaMin(pau);
+      setSettLavoroStr(String(lav));
+      setSettPausaStr(String(pau));
+      if (!running) {
+        setSecondi(lav * 60);
+        baseSecondiRef.current = lav * 60;
+        setFase('lavoro');
+      }
+
+      setMinutiOggi(getMinutiStudioOggi(getBudgetCutoff()));
+
+      if (!getSetting('trainer_visto')) {
+        setShowManifesto(true);
+      }
+
       if (selectedId !== null) refreshStats(selectedId, list);
+
       return () => {
         if (intervalRef.current) clearInterval(intervalRef.current);
         setRunning(false);
@@ -84,8 +132,28 @@ export default function StudioScreen() {
     if (intervalRef.current) clearInterval(intervalRef.current);
     setRunning(false);
     setFase('lavoro');
-    setSecondi(POMODORO_LAVORO);
-    baseSecondiRef.current = POMODORO_LAVORO;
+    setSecondi(lavoroMin * 60);
+    baseSecondiRef.current = lavoroMin * 60;
+  }
+
+  function resetBudget() {
+    setSetting('deep_work_reset_ts', new Date().toISOString());
+    setMinutiOggi(0);
+  }
+
+  function salvaSettings() {
+    const lav = Math.max(1, Math.min(120, parseInt(settLavoroStr, 10) || 25));
+    const pau = Math.max(1, Math.min(60, parseInt(settPausaStr, 10) || 5));
+    setSetting('pomodoro_lavoro', String(lav));
+    setSetting('pomodoro_pausa', String(pau));
+    setLavoroMin(lav);
+    setPausaMin(pau);
+    if (!running) {
+      setSecondi(lav * 60);
+      baseSecondiRef.current = lav * 60;
+      setFase('lavoro');
+    }
+    setShowSettings(false);
   }
 
   function startStop() {
@@ -110,34 +178,70 @@ export default function StudioScreen() {
         setRunning(false);
         if (fase === 'lavoro') {
           if (selectedId) {
-            insertSessione(selectedId, 25);
+            insertSessione(selectedId, lavoroMin);
             setSessioni((s) => s + 1);
             refreshStats(selectedId);
+            const newMinuti = getMinutiStudioOggi(getBudgetCutoff());
+            setMinutiOggi(newMinuti);
           }
           setFase('pausa');
-          setSecondi(POMODORO_PAUSA);
-          baseSecondiRef.current = POMODORO_PAUSA;
+          setSecondi(pausaMin * 60);
+          baseSecondiRef.current = pausaMin * 60;
         } else {
           setFase('lavoro');
-          setSecondi(POMODORO_LAVORO);
-          baseSecondiRef.current = POMODORO_LAVORO;
+          setSecondi(lavoroMin * 60);
+          baseSecondiRef.current = lavoroMin * 60;
         }
       } else {
         setSecondi(rimanenti);
       }
     }, 500);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [running, fase, selectedId]);
+  }, [running, fase, selectedId, lavoroMin, pausaMin]);
 
   const esameSelezionato = esami.find((e) => e.id === selectedId);
-  const durata = fase === 'lavoro' ? POMODORO_LAVORO : POMODORO_PAUSA;
+  const durata = fase === 'lavoro' ? lavoroMin * 60 : pausaMin * 60;
   const progress = 1 - secondi / durata;
-  const faseColor = fase === 'lavoro' ? C.accent : C.success;
+  const deepColor = shallowMode ? C.warning : C.accent;
+  const faseColor = fase === 'lavoro' ? deepColor : C.success;
+  const budgetProgress = Math.min(minutiOggi / DEEP_WORK_LIMIT, 1);
 
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: C.background }]} edges={['top']}>
       <ScrollView contentContainerStyle={s.content}>
         <Text style={[s.title, { color: C.textPrimary, fontFamily: fonts.dot }]}>Studio</Text>
+
+        {/* Deep Work Budget */}
+        <View style={[s.card, { backgroundColor: C.card, borderColor: shallowMode ? C.warning + '66' : C.border }]}>
+          <View style={s.budgetHeader}>
+            <Text style={[s.label, { color: C.textSecondary, fontFamily: fonts.mono, marginBottom: 0 }]}>
+              DEEP WORK BUDGET
+            </Text>
+            <TouchableOpacity onPress={resetBudget} style={s.resetBudgetBtn}>
+              <MaterialCommunityIcons name="refresh" size={13} color={C.textMuted} />
+              <Text style={[s.resetBudgetText, { color: C.textMuted, fontFamily: fonts.mono }]}>RESET</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={s.budgetRow}>
+            <Text style={[s.budgetNum, { color: deepColor, fontFamily: fonts.dot }]}>
+              {formatMinuti(minutiOggi)}
+            </Text>
+            <Text style={[s.budgetOf, { color: C.textMuted, fontFamily: fonts.mono }]}>
+              {' / 4h'}
+            </Text>
+          </View>
+          <View style={[s.progressTrack, { backgroundColor: C.border }]}>
+            <View style={[s.progressFill, { width: `${budgetProgress * 100}%` as any, backgroundColor: deepColor }]} />
+          </View>
+          {shallowMode && (
+            <View style={[s.shallowBanner, { backgroundColor: C.warning + '22', borderColor: C.warning + '55' }]}>
+              <MaterialCommunityIcons name="brain" size={14} color={C.warning} />
+              <Text style={[s.shallowText, { color: C.warning, fontFamily: fonts.mono }]}>
+                Budget cognitivo esaurito. Sei in Shallow Zone — puoi continuare, ma il deep focus è degradato.
+              </Text>
+            </View>
+          )}
+        </View>
 
         {/* Exam selector */}
         <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
@@ -153,7 +257,10 @@ export default function StudioScreen() {
                 onPress={() => !running && setMenuVisible(true)}
                 activeOpacity={0.7}
               >
-                <Text style={[s.selectorText, { color: esameSelezionato ? C.textPrimary : C.textMuted, fontFamily: fonts.mono }]} numberOfLines={1}>
+                <Text
+                  style={[s.selectorText, { color: esameSelezionato ? C.textPrimary : C.textMuted, fontFamily: fonts.mono }]}
+                  numberOfLines={1}
+                >
                   {esameSelezionato ? esameSelezionato.nome : 'Seleziona esame...'}
                 </Text>
                 <MaterialCommunityIcons name="chevron-down" size={18} color={C.textMuted} />
@@ -171,26 +278,30 @@ export default function StudioScreen() {
 
         {/* Timer */}
         <View style={[s.card, s.timerCard, { backgroundColor: C.card, borderColor: C.border }]}>
-          <Text style={[s.faseLabel, { color: C.textMuted, fontFamily: fonts.mono }]}>
-            {fase === 'lavoro' ? 'SESSIONE FOCUS' : 'PAUSA'}
-          </Text>
+          <View style={s.timerTopRow}>
+            <Text style={[s.faseLabel, { color: shallowMode && fase === 'lavoro' ? C.warning : C.textMuted, fontFamily: fonts.mono }]}>
+              {fase === 'lavoro' ? (shallowMode ? 'SHALLOW ZONE' : 'SESSIONE FOCUS') : 'PAUSA'}
+            </Text>
+            <TouchableOpacity
+              onPress={() => !running && setShowSettings(true)}
+              style={s.settingsIcon}
+              activeOpacity={0.7}
+            >
+              <MaterialCommunityIcons name="tune-variant" size={18} color={C.textMuted} />
+            </TouchableOpacity>
+          </View>
 
           <Text style={[s.timerNum, { color: faseColor, fontFamily: fonts.dot }]}>
             {formatTime(secondi)}
           </Text>
 
-          {/* Progress track */}
           <View style={[s.progressTrack, { backgroundColor: C.border }]}>
             <View style={[s.progressFill, { width: `${progress * 100}%` as any, backgroundColor: faseColor }]} />
           </View>
 
-          {/* Buttons */}
           <View style={s.timerBtns}>
             <TouchableOpacity
-              style={[
-                s.playBtn,
-                { backgroundColor: selectedId ? faseColor : C.border },
-              ]}
+              style={[s.playBtn, { backgroundColor: selectedId ? faseColor : C.border }]}
               onPress={startStop}
               disabled={!selectedId}
               activeOpacity={0.85}
@@ -213,10 +324,10 @@ export default function StudioScreen() {
           </View>
 
           <Text style={[s.sessioniCount, { color: C.textMuted, fontFamily: fonts.mono }]}>
-            Sessioni oggi:{' '}
-            <Text style={[s.sessioniCount, { color: faseColor, fontFamily: fonts.dot }]}>
-              {String(sessioni)}
-            </Text>
+            {'Sessioni oggi: '}
+            <Text style={{ color: faseColor, fontFamily: fonts.dot }}>{String(sessioni)}</Text>
+            {'  ·  '}
+            {`${lavoroMin}m + ${pausaMin}m`}
           </Text>
         </View>
 
@@ -295,6 +406,91 @@ export default function StudioScreen() {
           </View>
         )}
       </ScrollView>
+
+      <Portal>
+        {/* Manifesto — primo accesso */}
+        <Dialog
+          visible={showManifesto}
+          onDismiss={() => {}}
+          dismissable={false}
+          style={[s.dialog, { backgroundColor: C.surface }]}
+        >
+          <Dialog.Title style={[s.dialogTitle, { color: C.textPrimary, fontFamily: fonts.dot }]}>
+            Personal Trainer
+          </Dialog.Title>
+          <Dialog.Content style={s.dialogContent}>
+            <Text style={[s.manifestoHeading, { color: C.accent, fontFamily: fonts.mono }]}>
+              LA REGOLA DELLE 4 ORE
+            </Text>
+            <Text style={[s.manifestoBody, { color: C.textPrimary, fontFamily: fonts.mono }]}>
+              Cal Newport lo ha dimostrato: il cervello umano non può sostenere più di 4 ore di concentrazione profonda al giorno.
+            </Text>
+            <Text style={[s.manifestoBody, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+              {'Studiare 10 ore di fila non è produttività — è '}
+              <Text style={{ color: C.warning }}>burnout</Text>
+              {'. Oltre il limite entri in Shallow Zone: meno memoria, meno comprensione.'}
+            </Text>
+            <Text style={[s.manifestoBody, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+              Questa app traccia il tuo budget cognitivo. Quando lo esaurisci, te lo segnala. Puoi continuare — ma sarai avvisato.
+            </Text>
+            <Text style={[s.manifestoMotto, { color: C.textMuted, fontFamily: fonts.mono }]}>
+              Il focus chirurgico batte sempre la maratona.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              mode="contained"
+              onPress={() => { setSetting('trainer_visto', '1'); setShowManifesto(false); }}
+              buttonColor={C.accent}
+              textColor="#000"
+              style={{ flex: 1 }}
+            >
+              Ho capito — inizia
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* Settings Pomodoro */}
+        <Dialog
+          visible={showSettings}
+          onDismiss={() => setShowSettings(false)}
+          style={[s.dialog, { backgroundColor: C.surface }]}
+        >
+          <Dialog.Title style={[s.dialogTitle, { color: C.textPrimary, fontFamily: fonts.mono }]}>
+            Configura Pomodoro
+          </Dialog.Title>
+          <Dialog.Content style={s.dialogContent}>
+            <TextInput
+              label="Focus (minuti)"
+              value={settLavoroStr}
+              onChangeText={setSettLavoroStr}
+              keyboardType="numeric"
+              mode="outlined"
+              outlineColor={C.border}
+              activeOutlineColor={C.accent}
+              textColor={C.textPrimary}
+              style={{ backgroundColor: C.card }}
+            />
+            <TextInput
+              label="Pausa (minuti)"
+              value={settPausaStr}
+              onChangeText={setSettPausaStr}
+              keyboardType="numeric"
+              mode="outlined"
+              outlineColor={C.border}
+              activeOutlineColor={C.accent}
+              textColor={C.textPrimary}
+              style={{ backgroundColor: C.card }}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button textColor={C.textSecondary} onPress={() => setShowSettings(false)}>Annulla</Button>
+            <Button mode="contained" onPress={salvaSettings} buttonColor={C.accent} textColor="#000">
+              Salva
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </SafeAreaView>
   );
 }
@@ -306,6 +502,22 @@ const s = StyleSheet.create({
   card: { borderRadius: 16, borderWidth: 1, padding: 16 },
   timerCard: { alignItems: 'center', gap: 14 },
   label: { fontSize: 10, letterSpacing: 2, marginBottom: 10 },
+  budgetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  resetBudgetBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  resetBudgetText: { fontSize: 10, letterSpacing: 1 },
+  budgetRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginBottom: 10 },
+  budgetNum: { fontSize: 36, lineHeight: 38 },
+  budgetOf: { fontSize: 14 },
+  shallowBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginTop: 10,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+  },
+  shallowText: { flex: 1, fontSize: 11, lineHeight: 16 },
   selectorBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -316,27 +528,16 @@ const s = StyleSheet.create({
     paddingVertical: 11,
   },
   selectorText: { fontSize: 14, flex: 1 },
+  timerTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
   faseLabel: { fontSize: 11, letterSpacing: 2 },
+  settingsIcon: { padding: 4 },
   timerNum: { fontSize: 88, lineHeight: 88 },
   progressTrack: { width: '100%', height: 2, borderRadius: 1, overflow: 'hidden' },
   progressFill: { height: '100%' },
   timerBtns: { flexDirection: 'row', gap: 12, alignItems: 'center' },
-  playBtn: {
-    width: 68,
-    height: 68,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  resetBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sessioniCount: { fontSize: 13 },
+  playBtn: { width: 68, height: 68, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  resetBtn: { width: 48, height: 48, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  sessioniCount: { fontSize: 12 },
   roiRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   roiItem: { flex: 1, alignItems: 'center', gap: 2 },
   roiNum: { fontSize: 36, lineHeight: 38 },
@@ -352,4 +553,10 @@ const s = StyleSheet.create({
   },
   sessioneMin: { fontSize: 24, lineHeight: 26 },
   sessioneData: { fontSize: 12 },
+  dialog: { borderRadius: 20 },
+  dialogTitle: { fontSize: 20 },
+  dialogContent: { gap: 12 },
+  manifestoHeading: { fontSize: 11, letterSpacing: 2 },
+  manifestoBody: { fontSize: 13, lineHeight: 20 },
+  manifestoMotto: { fontSize: 12, lineHeight: 18, fontStyle: 'italic', marginTop: 4 },
 });

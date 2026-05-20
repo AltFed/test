@@ -11,7 +11,7 @@ Tracker universitario per iOS/Android costruito con Expo Router, SQLite locale e
 - **Dettaglio esame** — task (scritto/orale/progetto/ore), orario lezioni settimanale, timer studio, registrazione voto con lode
 - **Orario** — vista settimanale aggregata di tutte le lezioni
 - **Simulatore** — sliding doors (voti ipotetici), calcolatore target media, conversione /110
-- **Studio** — sessioni di studio con timer, storico per esame
+- **Studio / Personal Trainer** — Pomodoro personalizzabile (focus + pausa configurabili), budget Deep Work giornaliero da 4h (Cal Newport), Shallow Zone con cambio colori quando il budget è esaurito, reset manuale del budget
 - **Impostazioni** — data laurea, CFU totali, tema
 
 ---
@@ -68,6 +68,8 @@ impostazioni   (chiave, valore)
 ```
 
 > **30 con lode** è salvato come `voto_finale = 33` e mostrato come `30L`. La media ponderata normalizza automaticamente 33 → 30 prima del calcolo.
+
+> **Personal Trainer**: al primo accesso alla tab Studio compare un manifesto con la filosofia Deep Work. Le impostazioni `pomodoro_lavoro`, `pomodoro_pausa`, `trainer_visto` e `deep_work_reset_ts` sono salvate nella tabella `impostazioni`.
 
 ---
 

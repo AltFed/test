@@ -169,6 +169,13 @@ export function getSessioniRecenti(esameId: number): SessioneStudio[] {
   );
 }
 
+export function getMinutiStudioOggi(fromTs: string): number {
+  return db().getFirstSync<{ tot: number }>(
+    'SELECT COALESCE(SUM(durata_minuti), 0) as tot FROM sessioni_studio WHERE data >= ?',
+    fromTs
+  )?.tot ?? 0;
+}
+
 // --- Lezioni ---
 
 export function getAllLezioniConEsame(): LezioneConEsame[] {

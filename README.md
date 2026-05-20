@@ -12,7 +12,9 @@ Tracker universitario per iOS/Android costruito con Expo Router, SQLite locale e
 - **Orario** — vista settimanale aggregata di tutte le lezioni
 - **Simulatore** — sliding doors (voti ipotetici), calcolatore target media, conversione /110
 - **Pianificatore** — task di studio per esame (nome, difficoltà 1-10, ore stimate), blocchi orari occupati, algoritmo greedy che genera un piano giornaliero rispettando il limite 4h Deep Work/giorno
-- **Studio / Personal Trainer** — Pomodoro personalizzabile (focus + pausa configurabili), budget Deep Work giornaliero da 4h (Cal Newport), Shallow Zone con cambio colori quando il budget è esaurito, reset manuale del budget
+- **Studio / Personal Trainer** — Pomodoro personalizzabile (focus + pausa configurabili), budget Deep Work giornaliero da 4h (Cal Newport), Shallow Zone con cambio colori quando il budget è esaurito, reset manuale del budget; sezione Flashcard con accesso ai deck per esame
+- **Flashcard** — deck per esame con domanda/risposta, navigazione prev/next, tap-to-flip, aggiunta/eliminazione carte, lista completa con swipe-to-delete
+- **Esami — Import massivo** — incolla più esami in formato "Nome CFU [tirocinio]" (uno per riga) per importarli tutti in un colpo solo
 - **Impostazioni** — data laurea, CFU totali, tema
 
 ---
@@ -38,12 +40,13 @@ Tracker universitario per iOS/Android costruito con Expo Router, SQLite locale e
 app/
 ├── (tabs)/
 │   ├── index.tsx          # Dashboard
-│   ├── esami.tsx          # Lista esami
-│   ├── orario.tsx         # Vista settimanale lezioni
+│   ├── esami.tsx          # Lista esami + import massivo
+│   ├── orario.tsx         # Vista settimanale lezioni + pianificatore
 │   ├── simulatore.tsx     # Simulatore media
-│   ├── studio.tsx         # Timer sessioni di studio
+│   ├── studio.tsx         # Timer sessioni di studio + flashcard list
 │   └── _layout.tsx        # Tab bar
 ├── esame/[id].tsx         # Dettaglio esame
+├── flashcard/[esameId].tsx # Deck flashcard per esame
 ├── impostazioni.tsx
 └── _layout.tsx            # Root layout (PaperProvider, SQLite init)
 
@@ -69,6 +72,7 @@ impostazioni   (chiave, valore)
 task_studio    (id, esame_id, nome, difficolta, ore_stimate, completato)
 blocchi_occupati(id, data, ora_inizio, ora_fine, etichetta)
 piano_studio   (id, task_id, data, ora_inizio, ora_fine, ore_pianificate)
+flashcard      (id, esame_id, domanda, risposta, created_at)
 ```
 
 > **30 con lode** è salvato come `voto_finale = 33` e mostrato come `30L`. La media ponderata normalizza automaticamente 33 → 30 prima del calcolo.

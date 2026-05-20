@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text, Portal, Dialog, Button, TextInput } from 'react-native-paper';
 import { useFocusEffect, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,27 @@ import { useColors, fonts } from '@/theme';
 import { SwipeableRow } from '@/components/SwipeableRow';
 import { getAllEsami, insertEsame, deleteEsame, getOreStudiate } from '@/db/database';
 import type { Esame } from '@/db/types';
+
+function parseImportText(text: string): Array<{ nome: string; cfu: number; tipo: 'voto' | 'tirocinio' }> {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .flatMap((line) => {
+      const tokens = line.split(/\s+/);
+      const tipo: 'voto' | 'tirocinio' = tokens.some((t) =>
+        t.toLowerCase().startsWith('tirocin')
+      ) ? 'tirocinio' : 'voto';
+      const numIdx = tokens.findIndex((t) => /^\d+$/.test(t));
+      if (numIdx === -1) return [];
+      const cfu = parseInt(tokens[numIdx], 10);
+      const nome = tokens
+        .filter((_, i) => i !== numIdx && !tokens[i].toLowerCase().startsWith('tirocin'))
+        .join(' ').trim();
+      if (!nome || !cfu) return [];
+      return [{ nome, cfu, tipo }];
+    });
+}
 
 type Filtro = 'tutti' | 'da_fare' | 'superati';
 
@@ -28,6 +49,8 @@ export default function EsamiScreen() {
   const [esami, setEsami] = useState<Esame[]>([]);
   const [filtro, setFiltro] = useState<Filtro>('tutti');
   const [dialogVisible, setDialogVisible] = useState(false);
+  const [importVisible, setImportVisible] = useState(false);
+  const [importText, setImportText] = useState('');
   const [oreMap, setOreMap] = useState<Record<number, number>>({});
 
   const [nome, setNome] = useState('');
@@ -51,6 +74,14 @@ export default function EsamiScreen() {
     if (filtro === 'superati') return e.superato === 1;
     return true;
   });
+
+  function salvaImport() {
+    const parsed = parseImportText(importText);
+    parsed.forEach(({ nome, cfu, tipo }) => insertEsame(nome, cfu, tipo));
+    setImportText('');
+    setImportVisible(false);
+    load();
+  }
 
   function salvaEsame() {
     if (!nome.trim() || !cfu.trim()) return;
@@ -178,6 +209,15 @@ export default function EsamiScreen() {
         })}
       </ScrollView>
 
+      {/* FAB import */}
+      <TouchableOpacity
+        style={[s.fabImport, { backgroundColor: C.card, borderColor: C.border }]}
+        onPress={() => setImportVisible(true)}
+        activeOpacity={0.85}
+      >
+        <MaterialCommunityIcons name="import" size={22} color={C.accent} />
+      </TouchableOpacity>
+
       {/* FAB */}
       <TouchableOpacity
         style={[s.fab, { backgroundColor: C.accent }]}
@@ -193,64 +233,35 @@ export default function EsamiScreen() {
           onDismiss={() => setDialogVisible(false)}
           style={[s.dialog, { backgroundColor: C.surface }]}
         >
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <Dialog.Title style={[s.dialogTitle, { color: C.textPrimary, fontFamily: fonts.mono }]}>
             Nuovo Esame
           </Dialog.Title>
-          <Dialog.Content style={s.dialogContent}>
-            <TextInput
-              label="Nome esame"
-              value={nome}
-              onChangeText={setNome}
-              mode="outlined"
-              outlineColor={C.border}
-              activeOutlineColor={C.accent}
-              textColor={C.textPrimary}
-              style={[s.input, { backgroundColor: C.card }]}
-            />
-            <TextInput
-              label="Professore (opzionale)"
-              value={professore}
-              onChangeText={setProfessore}
-              mode="outlined"
-              outlineColor={C.border}
-              activeOutlineColor={C.accent}
-              textColor={C.textPrimary}
-              style={[s.input, { backgroundColor: C.card }]}
-            />
-            <TextInput
-              label="CFU"
-              value={cfu}
-              onChangeText={setCfu}
-              keyboardType="numeric"
-              mode="outlined"
-              outlineColor={C.border}
-              activeOutlineColor={C.accent}
-              textColor={C.textPrimary}
-              style={[s.input, { backgroundColor: C.card }]}
-            />
-            <View style={s.tipoRow}>
-              {(['voto', 'tirocinio'] as const).map((t) => (
-                <TouchableOpacity
-                  key={t}
-                  onPress={() => setTipo(t)}
-                  style={[
-                    s.tipoPill,
-                    { borderColor: tipo === t ? C.accent : C.border },
-                    tipo === t && { backgroundColor: C.accentDim },
-                  ]}
-                >
-                  <Text style={[s.tipoPillText, { color: tipo === t ? C.accent : C.textMuted, fontFamily: fonts.mono }]}>
-                    {t === 'voto' ? 'VOTO (30mi)' : 'TIROCINIO'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {tipo === 'tirocinio' ? (
+          <Dialog.ScrollArea style={{ maxHeight: 380, paddingHorizontal: 24 }}>
+            <ScrollView contentContainerStyle={s.dialogContent} keyboardShouldPersistTaps="handled">
               <TextInput
-                label="Ore target tirocinio"
-                value={oreTarget}
-                onChangeText={setOreTarget}
+                label="Nome esame"
+                value={nome}
+                onChangeText={setNome}
+                mode="outlined"
+                outlineColor={C.border}
+                activeOutlineColor={C.accent}
+                textColor={C.textPrimary}
+                style={[s.input, { backgroundColor: C.card }]}
+              />
+              <TextInput
+                label="Professore (opzionale)"
+                value={professore}
+                onChangeText={setProfessore}
+                mode="outlined"
+                outlineColor={C.border}
+                activeOutlineColor={C.accent}
+                textColor={C.textPrimary}
+                style={[s.input, { backgroundColor: C.card }]}
+              />
+              <TextInput
+                label="CFU"
+                value={cfu}
+                onChangeText={setCfu}
                 keyboardType="numeric"
                 mode="outlined"
                 outlineColor={C.border}
@@ -258,8 +269,38 @@ export default function EsamiScreen() {
                 textColor={C.textPrimary}
                 style={[s.input, { backgroundColor: C.card }]}
               />
-            ) : null}
-          </Dialog.Content>
+              <View style={s.tipoRow}>
+                {(['voto', 'tirocinio'] as const).map((t) => (
+                  <TouchableOpacity
+                    key={t}
+                    onPress={() => setTipo(t)}
+                    style={[
+                      s.tipoPill,
+                      { borderColor: tipo === t ? C.accent : C.border },
+                      tipo === t && { backgroundColor: C.accentDim },
+                    ]}
+                  >
+                    <Text style={[s.tipoPillText, { color: tipo === t ? C.accent : C.textMuted, fontFamily: fonts.mono }]}>
+                      {t === 'voto' ? 'VOTO (30mi)' : 'TIROCINIO'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {tipo === 'tirocinio' ? (
+                <TextInput
+                  label="Ore target tirocinio"
+                  value={oreTarget}
+                  onChangeText={setOreTarget}
+                  keyboardType="numeric"
+                  mode="outlined"
+                  outlineColor={C.border}
+                  activeOutlineColor={C.accent}
+                  textColor={C.textPrimary}
+                  style={[s.input, { backgroundColor: C.card }]}
+                />
+              ) : null}
+            </ScrollView>
+          </Dialog.ScrollArea>
           <Dialog.Actions>
             <Button textColor={C.textSecondary} onPress={() => setDialogVisible(false)}>Annulla</Button>
             <Button
@@ -272,7 +313,51 @@ export default function EsamiScreen() {
               Aggiungi
             </Button>
           </Dialog.Actions>
-          </KeyboardAvoidingView>
+        </Dialog>
+
+        {/* Dialog import massivo */}
+        <Dialog
+          visible={importVisible}
+          onDismiss={() => setImportVisible(false)}
+          style={[s.dialog, { backgroundColor: C.surface }]}
+        >
+          <Dialog.Title style={[s.dialogTitle, { color: C.textPrimary, fontFamily: fonts.mono }]}>
+            Import Massivo
+          </Dialog.Title>
+          <Dialog.Content style={s.dialogContent}>
+            <Text style={[s.importHint, { color: C.textMuted, fontFamily: fonts.mono }]}>
+              {'Una riga per esame: "Nome Esame CFU [tirocinio]"\nEs: Analisi Matematica 9\nFisica 6\nTirocinio Azienda 6 tirocinio'}
+            </Text>
+            <TextInput
+              label="Incolla qui la lista"
+              value={importText}
+              onChangeText={setImportText}
+              mode="outlined"
+              multiline
+              numberOfLines={8}
+              outlineColor={C.border}
+              activeOutlineColor={C.accent}
+              textColor={C.textPrimary}
+              style={[s.input, { backgroundColor: C.card, minHeight: 160 }]}
+            />
+            {importText.trim() ? (
+              <Text style={[s.importPreview, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+                {String(parseImportText(importText).length)} esami rilevati
+              </Text>
+            ) : null}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button textColor={C.textSecondary} onPress={() => setImportVisible(false)}>Annulla</Button>
+            <Button
+              mode="contained"
+              onPress={salvaImport}
+              disabled={parseImportText(importText).length === 0}
+              buttonColor={C.accent}
+              textColor="#000000"
+            >
+              Importa
+            </Button>
+          </Dialog.Actions>
         </Dialog>
       </Portal>
     </SafeAreaView>
@@ -317,6 +402,19 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  fabImport: {
+    position: 'absolute',
+    right: 88,
+    bottom: 28,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  importHint: { fontSize: 11, lineHeight: 18, marginBottom: 4 },
+  importPreview: { fontSize: 11, textAlign: 'right' },
   dialog: { borderRadius: 20 },
   dialogTitle: { fontSize: 18 },
   dialogContent: { gap: 12 },

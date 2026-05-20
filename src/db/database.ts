@@ -2,6 +2,7 @@ import * as SQLite from 'expo-sqlite';
 import type {
   Esame, Modulo, SessioneStudio, Lezione, LezioneConEsame,
   TaskStudio, TaskConEsame, BloccoOccupato, PianoSessione, PianoSessioneConTask,
+  Flashcard,
 } from './types';
 
 let _db: SQLite.SQLiteDatabase | null = null;
@@ -75,6 +76,15 @@ export function initDatabase(): void {
       ora_inizio TEXT NOT NULL,
       ora_fine TEXT NOT NULL,
       etichetta TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS flashcard (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      esame_id INTEGER NOT NULL,
+      domanda TEXT NOT NULL,
+      risposta TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (esame_id) REFERENCES esami(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS piano_studio (
@@ -406,6 +416,35 @@ function _placeSession(
   }
   return null;
 }
+
+// --- Flashcard ---
+
+export function getFlashcard(esameId: number): Flashcard[] {
+  return db().getAllSync<Flashcard>(
+    'SELECT * FROM flashcard WHERE esame_id = ? ORDER BY created_at ASC',
+    esameId
+  );
+}
+
+export function countFlashcard(esameId: number): number {
+  return db().getFirstSync<{ n: number }>(
+    'SELECT COUNT(*) as n FROM flashcard WHERE esame_id = ?',
+    esameId
+  )?.n ?? 0;
+}
+
+export function insertFlashcard(esameId: number, domanda: string, risposta: string): void {
+  db().runSync(
+    'INSERT INTO flashcard (esame_id, domanda, risposta, created_at) VALUES (?, ?, ?, ?)',
+    esameId, domanda, risposta, new Date().toISOString()
+  );
+}
+
+export function deleteFlashcard(id: number): void {
+  db().runSync('DELETE FROM flashcard WHERE id = ?', id);
+}
+
+// --- Algoritmo piano studio ---
 
 export function generatePiano(): void {
   db().runSync('DELETE FROM piano_studio');

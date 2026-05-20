@@ -336,7 +336,7 @@ const s = StyleSheet.create({
   safe: { flex: 1 },
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
   title: { fontSize: 36, lineHeight: 38 },
-  content: { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 8 },
+  content: { paddingHorizontal: 16, paddingBottom: 100, paddingTop: 8 },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   sectionLabel: { fontSize: 10, letterSpacing: 2 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },

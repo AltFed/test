@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Text, Portal, Dialog, Button, Menu, TextInput } from 'react-native-paper';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors, fonts } from '@/theme';
@@ -13,6 +13,7 @@ import {
   getMinutiStudioOggi,
   getSetting,
   setSetting,
+  countFlashcard,
 } from '@/db/database';
 import type { Esame, SessioneStudio } from '@/db/types';
 
@@ -405,6 +406,42 @@ export default function StudioScreen() {
             ))}
           </View>
         )}
+        {/* Flashcard */}
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <Text style={[s.label, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+            FLASHCARD
+          </Text>
+          {esami.length === 0 ? (
+            <Text style={[s.sessioneData, { color: C.textMuted, fontFamily: fonts.mono }]}>
+              Aggiungi un esame per creare un deck.
+            </Text>
+          ) : (
+            esami.map((e) => {
+              const n = countFlashcard(e.id);
+              return (
+                <TouchableOpacity
+                  key={e.id}
+                  style={[s.flashRow, { borderBottomColor: C.border }]}
+                  onPress={() => router.push(`/flashcard/${e.id}`)}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.flashNome, { color: C.textPrimary, fontFamily: fonts.mono }]} numberOfLines={1}>
+                      {e.nome}
+                    </Text>
+                  </View>
+                  <View style={[s.flashCount, { backgroundColor: n > 0 ? C.accentDim : C.border }]}>
+                    <Text style={[s.flashCountText, { color: n > 0 ? C.accent : C.textMuted, fontFamily: fonts.dot }]}>
+                      {String(n)}
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={16} color={C.textMuted} />
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </View>
+
       </ScrollView>
 
       <Portal>
@@ -497,7 +534,7 @@ export default function StudioScreen() {
 
 const s = StyleSheet.create({
   safe: { flex: 1 },
-  content: { padding: 16, gap: 12, paddingBottom: 40 },
+  content: { padding: 16, gap: 12, paddingBottom: 100 },
   title: { fontSize: 36, lineHeight: 38, marginBottom: 4 },
   card: { borderRadius: 16, borderWidth: 1, padding: 16 },
   timerCard: { alignItems: 'center', gap: 14 },
@@ -559,4 +596,8 @@ const s = StyleSheet.create({
   manifestoHeading: { fontSize: 11, letterSpacing: 2 },
   manifestoBody: { fontSize: 13, lineHeight: 20 },
   manifestoMotto: { fontSize: 12, lineHeight: 18, fontStyle: 'italic', marginTop: 4 },
+  flashRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 10 },
+  flashNome: { fontSize: 13 },
+  flashCount: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  flashCountText: { fontSize: 20, lineHeight: 22 },
 });

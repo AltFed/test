@@ -82,3 +82,11 @@ export interface PianoSessioneConTask extends PianoSessione {
   nome_esame: string;
   difficolta: number;
 }
+
+export interface Flashcard {
+  id: number;
+  esame_id: number;
+  domanda: string;
+  risposta: string;
+  created_at: string;
+}

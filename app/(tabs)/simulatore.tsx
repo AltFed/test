@@ -20,7 +20,7 @@ function mediaConLode(v: number): number { return v === 33 ? 30 : v; }
 function calcolaMedia(esami: Esame[], ipotesi: VotoIpotetico[]): number {
   const reali = esami
     .filter((e) => e.superato && e.tipo === 'voto' && e.voto_finale)
-    .map((e) => ({ voto: e.voto_finale!, cfu: e.cfu }));
+    .map((e) => ({ voto: mediaConLode(e.voto_finale!), cfu: e.cfu }));
   const extra = ipotesi
     .filter((h) => h.voto && h.cfu)
     .map((h) => ({ voto: mediaConLode(parseInt(h.voto, 10)), cfu: parseInt(h.cfu, 10) }))
@@ -35,7 +35,7 @@ function calcolaMedia(esami: Esame[], ipotesi: VotoIpotetico[]): number {
 function votoNecessarioPer(target: number, esami: Esame[], cfu: number): number | null {
   const reali = esami
     .filter((e) => e.superato && e.tipo === 'voto' && e.voto_finale)
-    .map((e) => ({ voto: e.voto_finale!, cfu: e.cfu }));
+    .map((e) => ({ voto: mediaConLode(e.voto_finale!), cfu: e.cfu }));
   if (reali.length === 0) return null;
   const sumCfu = reali.reduce((s, e) => s + e.cfu, 0);
   const sumPeso = reali.reduce((s, e) => s + e.voto * e.cfu, 0);

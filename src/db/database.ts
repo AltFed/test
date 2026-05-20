@@ -214,7 +214,7 @@ export function getMediaPonderata(extraVoti?: { voto: number; cfu: number }[]): 
   const all = [...esami, ...(extraVoti ?? [])];
   if (all.length === 0) return 0;
   const sumCfu = all.reduce((s, e) => s + e.cfu, 0);
-  const sumPeso = all.reduce((s, e) => s + e.voto * e.cfu, 0);
+  const sumPeso = all.reduce((s, e) => s + (e.voto === 33 ? 30 : e.voto) * e.cfu, 0);
   return Math.round((sumPeso / sumCfu) * 100) / 100;
 }
 

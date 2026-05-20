@@ -20,13 +20,37 @@ import {
   deleteModulo,
   getOreStudiate,
   updateEsameVoto,
+  updateEsameDataEsame,
   getLezioniByEsame,
   insertLezione,
   deleteLezione,
+  getTaskStudio,
+  insertTaskStudio,
+  toggleTaskStudio,
+  deleteTaskStudio,
 } from '@/db/database';
-import type { Esame, Modulo, Lezione } from '@/db/types';
+import type { Esame, Modulo, Lezione, TaskStudio } from '@/db/types';
 
 const GIORNI = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
+const GIORNI_SHORT = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+const MESI_SHORT = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
+
+function formatDateLabel(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  return `${GIORNI_SHORT[d.getDay()]} ${d.getDate()} ${MESI_SHORT[d.getMonth()]}`;
+}
+
+function giorniRimanenti(dateStr: string): number {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr + 'T00:00:00');
+  return Math.ceil((target.getTime() - today.getTime()) / 86400000);
+}
+
+function diffColor(d: number, C: ReturnType<typeof import('@/theme').useColors>): string {
+  if (d <= 3) return C.success;
+  if (d <= 6) return C.warning;
+  return C.destructive;
+}
 
 const PALETTE = [
   '#FFE600', '#30D158', '#0A84FF', '#FF9F0A',
@@ -49,6 +73,7 @@ export default function EsameDetail() {
   const [esame, setEsame] = useState<Esame | null>(null);
   const [moduli, setModuli] = useState<Modulo[]>([]);
   const [lezioni, setLezioni] = useState<Lezione[]>([]);
+  const [taskPiano, setTaskPiano] = useState<TaskStudio[]>([]);
   const [ore, setOre] = useState(0);
 
   const [dialogModulo, setDialogModulo] = useState(false);
@@ -66,6 +91,14 @@ export default function EsameDetail() {
   const [lezAula, setLezAula] = useState('');
   const [lezColore, setLezColore] = useState(PALETTE[0]);
 
+  const [dialogTask, setDialogTask] = useState(false);
+  const [taskNome, setTaskNome] = useState('');
+  const [taskDiff, setTaskDiff] = useState(5);
+  const [taskOreStr, setTaskOreStr] = useState('');
+
+  const [dialogDataEsame, setDialogDataEsame] = useState(false);
+  const [dataEsameStr, setDataEsameStr] = useState('');
+
   const load = useCallback(() => {
     const e = getEsame(esameId);
     setEsame(e);
@@ -73,6 +106,7 @@ export default function EsameDetail() {
       navigation.setOptions({ title: e.nome });
       setModuli(getModuli(esameId));
       setLezioni(getLezioniByEsame(esameId));
+      setTaskPiano(getTaskStudio(esameId));
       setOre(getOreStudiate(esameId));
     }
   }, [esameId]);
@@ -99,6 +133,26 @@ export default function EsameDetail() {
     insertLezione(esameId, lezGiorno, lezInizio.trim(), lezFine.trim(), lezAula.trim(), lezColore);
     setLezInizio(''); setLezFine(''); setLezAula(''); setLezGiorno(0); setLezColore(PALETTE[0]);
     setDialogLezione(false);
+    load();
+  }
+
+  function salvaTask() {
+    if (!taskNome.trim()) return;
+    const defaultOre = parseFloat((taskDiff * (esame?.cfu ?? 6) * 0.2).toFixed(1));
+    const ore_stimate = taskOreStr ? parseFloat(taskOreStr) : defaultOre;
+    if (isNaN(ore_stimate) || ore_stimate <= 0) return;
+    insertTaskStudio(esameId, taskNome.trim(), taskDiff, ore_stimate);
+    setTaskNome(''); setTaskDiff(5); setTaskOreStr('');
+    setDialogTask(false);
+    load();
+  }
+
+  function salvaDataEsame() {
+    const iso = dataEsameStr.trim();
+    const valid = /^\d{4}-\d{2}-\d{2}$/.test(iso);
+    if (!valid && iso !== '') return;
+    updateEsameDataEsame(esameId, iso || null);
+    setDialogDataEsame(false);
     load();
   }
 
@@ -135,6 +189,32 @@ export default function EsameDetail() {
                   </Text>
                 </View>
               </View>
+              <TouchableOpacity
+                style={s.dataEsameRow}
+                onPress={() => { setDataEsameStr(esame.data_esame ?? ''); setDialogDataEsame(true); }}
+              >
+                <MaterialCommunityIcons name="calendar-clock" size={13} color={C.textMuted} />
+                {esame.data_esame ? (
+                  <>
+                    <Text style={[s.dataEsameText, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+                      {formatDateLabel(esame.data_esame)}
+                    </Text>
+                    {(() => {
+                      const giorni = giorniRimanenti(esame.data_esame);
+                      const col = giorni < 7 ? C.destructive : giorni < 30 ? C.warning : C.textMuted;
+                      return (
+                        <Text style={[s.giorniTag, { color: col, fontFamily: fonts.dot }]}>
+                          {giorni > 0 ? `-${String(giorni)}g` : 'oggi'}
+                        </Text>
+                      );
+                    })()}
+                  </>
+                ) : (
+                  <Text style={[s.dataEsameText, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                    imposta data esame
+                  </Text>
+                )}
+              </TouchableOpacity>
             </View>
 
             <View style={s.votoBox}>
@@ -239,6 +319,64 @@ export default function EsameDetail() {
               </TouchableOpacity>
             </SwipeableRow>
           ))}
+        </View>
+
+        {/* Pianificatore */}
+        <View style={[s.card, { backgroundColor: C.card, borderColor: C.border }]}>
+          <View style={s.sectionHeader}>
+            <Text style={[s.sectionLabel, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+              PIANIFICATORE ({String(taskPiano.filter((t) => !t.completato).length)} da fare)
+            </Text>
+            <TouchableOpacity
+              style={[s.addPill, { borderColor: C.accent }]}
+              onPress={() => setDialogTask(true)}
+            >
+              <MaterialCommunityIcons name="plus" size={12} color={C.accent} />
+              <Text style={[s.addPillText, { color: C.accent, fontFamily: fonts.mono }]}>ADD</Text>
+            </TouchableOpacity>
+          </View>
+
+          {taskPiano.length === 0 ? (
+            <Text style={[s.muted, { color: C.textMuted, fontFamily: fonts.mono }]}>
+              Aggiungi i capitoli/argomenti da studiare con la loro difficoltà.
+            </Text>
+          ) : null}
+
+          {taskPiano.map((t) => {
+            const dc = diffColor(t.difficolta, C);
+            return (
+              <SwipeableRow key={t.id} onDelete={() => { deleteTaskStudio(t.id); load(); }}>
+                <TouchableOpacity
+                  style={[s.moduloRow, { borderBottomColor: C.border }]}
+                  onPress={() => { toggleTaskStudio(t.id, t.completato ? 0 : 1); load(); }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[s.checkbox, { borderColor: t.completato ? C.accent : C.border, backgroundColor: t.completato ? C.accentDim : 'transparent' }]}>
+                    {t.completato ? <MaterialCommunityIcons name="check" size={14} color={C.accent} /> : null}
+                  </View>
+                  <View style={s.moduloInfo}>
+                    <Text
+                      style={[
+                        s.moduloNome,
+                        { color: t.completato ? C.textMuted : C.textPrimary, fontFamily: fonts.mono },
+                        t.completato ? s.moduloStrike : undefined,
+                      ]}
+                    >
+                      {t.nome}
+                    </Text>
+                    <View style={[s.tipoTag, { backgroundColor: dc + '22' }]}>
+                      <Text style={[s.tipoTagText, { color: dc, fontFamily: fonts.mono }]}>
+                        D{String(t.difficolta)}
+                      </Text>
+                    </View>
+                    <Text style={[s.oreStimateText, { color: C.textMuted, fontFamily: fonts.mono }]}>
+                      {String(t.ore_stimate)}h
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </SwipeableRow>
+            );
+          })}
         </View>
 
         {/* Orario lezioni */}
@@ -404,6 +542,114 @@ export default function EsameDetail() {
               onPress={salvaVoto}
               disabled={!votoStr || parseInt(votoStr, 10) < 18 || parseInt(votoStr, 10) > 30}
               buttonColor={C.success}
+              textColor="#000"
+            >
+              Salva
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* Dialog task pianificatore */}
+        <Dialog
+          visible={dialogTask}
+          onDismiss={() => setDialogTask(false)}
+          style={[s.dialog, { backgroundColor: C.surface }]}
+        >
+          <Dialog.Title style={[s.dialogTitle, { color: C.textPrimary, fontFamily: fonts.mono }]}>
+            Nuovo Task Piano
+          </Dialog.Title>
+          <Dialog.Content style={s.dialogContent}>
+            <TextInput
+              label="Argomento (es. Cap 1-5, Esercizi...)"
+              value={taskNome}
+              onChangeText={setTaskNome}
+              mode="outlined"
+              outlineColor={C.border}
+              activeOutlineColor={C.accent}
+              textColor={C.textPrimary}
+              style={[s.input, { backgroundColor: C.card }]}
+            />
+            <Text style={[s.fieldLabel, { color: C.textSecondary, fontFamily: fonts.mono }]}>
+              DIFFICOLTÀ
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {[1,2,3,4,5,6,7,8,9,10].map((n) => {
+                  const dc = diffColor(n, C);
+                  const sel = taskDiff === n;
+                  return (
+                    <TouchableOpacity
+                      key={n}
+                      onPress={() => setTaskDiff(n)}
+                      style={[
+                        s.diffPill,
+                        { borderColor: sel ? dc : C.border },
+                        sel && { backgroundColor: dc + '22' },
+                      ]}
+                    >
+                      <Text style={[s.diffPillText, { color: sel ? dc : C.textMuted, fontFamily: fonts.mono }]}>
+                        {String(n)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+            <TextInput
+              label={`Ore stimate (default: ${(taskDiff * (esame.cfu) * 0.2).toFixed(1)}h)`}
+              value={taskOreStr}
+              onChangeText={setTaskOreStr}
+              keyboardType="decimal-pad"
+              mode="outlined"
+              outlineColor={C.border}
+              activeOutlineColor={C.accent}
+              textColor={C.textPrimary}
+              style={[s.input, { backgroundColor: C.card }]}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button textColor={C.textSecondary} onPress={() => setDialogTask(false)}>Annulla</Button>
+            <Button mode="contained" onPress={salvaTask} disabled={!taskNome.trim()} buttonColor={C.accent} textColor="#000">
+              Aggiungi
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* Dialog data esame */}
+        <Dialog
+          visible={dialogDataEsame}
+          onDismiss={() => setDialogDataEsame(false)}
+          style={[s.dialog, { backgroundColor: C.surface }]}
+        >
+          <Dialog.Title style={[s.dialogTitle, { color: C.textPrimary, fontFamily: fonts.mono }]}>
+            Data Esame
+          </Dialog.Title>
+          <Dialog.Content style={s.dialogContent}>
+            <TextInput
+              label="Data (AAAA-MM-GG)"
+              value={dataEsameStr}
+              onChangeText={setDataEsameStr}
+              mode="outlined"
+              outlineColor={C.border}
+              activeOutlineColor={C.accent}
+              textColor={C.textPrimary}
+              style={[s.input, { backgroundColor: C.card }]}
+              placeholder="2025-06-20"
+              placeholderTextColor={C.textMuted}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            {esame.data_esame ? (
+              <Button textColor={C.destructive} onPress={() => { updateEsameDataEsame(esameId, null); setDialogDataEsame(false); load(); }}>
+                Rimuovi
+              </Button>
+            ) : null}
+            <Button textColor={C.textSecondary} onPress={() => setDialogDataEsame(false)}>Annulla</Button>
+            <Button
+              mode="contained"
+              onPress={salvaDataEsame}
+              disabled={!!dataEsameStr && !/^\d{4}-\d{2}-\d{2}$/.test(dataEsameStr)}
+              buttonColor={C.accent}
               textColor="#000"
             >
               Salva
@@ -604,4 +850,10 @@ const s = StyleSheet.create({
   giornoPill: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   giornoPillText: { fontSize: 12, letterSpacing: 0.5 },
   colorDot: { width: 30, height: 30, borderRadius: 15 },
+  dataEsameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  dataEsameText: { fontSize: 12 },
+  giorniTag: { fontSize: 16, lineHeight: 18, marginLeft: 4 },
+  oreStimateText: { fontSize: 11 },
+  diffPill: { width: 36, paddingVertical: 8, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
+  diffPillText: { fontSize: 12, fontWeight: '700' },
 });

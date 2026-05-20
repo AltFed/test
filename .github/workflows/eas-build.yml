@@ -1,4 +1,4 @@
-name: EAS iOS Build
+name: iOS Build (unsigned IPA)
 
 on:
   push:
@@ -8,8 +8,8 @@ on:
 
 jobs:
   build-ios:
-    name: Build iOS (EAS)
-    runs-on: ubuntu-latest
+    name: Build unsigned IPA
+    runs-on: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -26,11 +26,38 @@ jobs:
       - name: Run TypeScript type check
         run: npx tsc --noEmit
 
-      - name: Setup Expo & EAS CLI
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Generate native iOS project
+        run: npx expo prebuild --platform ios --clean
 
-      - name: Build iOS (preview distribution)
-        run: eas build --platform ios --profile preview --non-interactive
+      - name: Install CocoaPods
+        run: pod install --project-directory=ios
+
+      - name: Build unsigned archive
+        run: |
+          xcodebuild \
+            -workspace ios/UniVersal.xcworkspace \
+            -scheme UniVersal \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath $RUNNER_TEMP/UniVersal.xcarchive \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            | xcpretty
+
+      - name: Package IPA
+        run: |
+          mkdir -p $RUNNER_TEMP/Payload
+          cp -r "$RUNNER_TEMP/UniVersal.xcarchive/Products/Applications/UniVersal.app" \
+            $RUNNER_TEMP/Payload/
+          cd $RUNNER_TEMP
+          zip -r UniVersal.ipa Payload/
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UniVersal-unsigned
+          path: ${{ runner.temp }}/UniVersal.ipa
+          retention-days: 7

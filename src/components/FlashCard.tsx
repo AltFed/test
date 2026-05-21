@@ -4,7 +4,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
-  Image,
   ScrollView,
 } from 'react-native';
 import { Text } from 'react-native-paper';
@@ -83,7 +82,7 @@ export function FlashCard({ card, index, total, onSo, onRipassare, accent }: Pro
           <Text style={[s.faceLabel, { color: accent, fontFamily: fonts.mono }]}>DOMANDA</Text>
           <ScrollView contentContainerStyle={s.faceContent} showsVerticalScrollIndicator={false}>
             <Text style={[s.fronteText, { color: C.textPrimary, fontFamily: fonts.mono }]}>
-              {card.fronte}
+              {card.domanda}
             </Text>
           </ScrollView>
           <View style={s.tapHint}>
@@ -105,18 +104,9 @@ export function FlashCard({ card, index, total, onSo, onRipassare, accent }: Pro
         >
           <Text style={[s.faceLabel, { color: C.textSecondary, fontFamily: fonts.mono }]}>RISPOSTA</Text>
           <ScrollView contentContainerStyle={s.faceContent} showsVerticalScrollIndicator={false}>
-            {card.retro_foto ? (
-              <Image
-                source={{ uri: card.retro_foto }}
-                style={s.retro_foto}
-                resizeMode="contain"
-              />
-            ) : null}
-            {card.retro ? (
-              <Text style={[s.retroText, { color: C.textPrimary, fontFamily: fonts.mono }]}>
-                {card.retro}
-              </Text>
-            ) : null}
+            <Text style={[s.retroText, { color: C.textPrimary, fontFamily: fonts.mono }]}>
+              {card.risposta}
+            </Text>
           </ScrollView>
         </Animated.View>
       </TouchableOpacity>
@@ -166,7 +156,6 @@ const s = StyleSheet.create({
   faceContent: { flexGrow: 1, justifyContent: 'center', paddingVertical: 8 },
   fronteText: { fontSize: 18, lineHeight: 28, textAlign: 'center' },
   retroText: { fontSize: 16, lineHeight: 26, textAlign: 'center' },
-  retro_foto: { width: '100%', height: 180, marginBottom: 8 },
   tapHint: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'center', marginTop: 4 },
   tapHintText: { fontSize: 11 },
   actions: {

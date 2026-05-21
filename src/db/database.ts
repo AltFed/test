@@ -1,5 +1,9 @@
 import * as SQLite from 'expo-sqlite';
-import type { Esame, Modulo, SessioneStudio, Lezione, LezioneConEsame, Flashcard } from './types';
+import type {
+  Esame, Modulo, SessioneStudio, Lezione, LezioneConEsame,
+  TaskStudio, TaskConEsame, BloccoOccupato, PianoSessione, PianoSessioneConTask,
+  Flashcard,
+} from './types';
 
 let _db: SQLite.SQLiteDatabase | null = null;
 
@@ -56,18 +60,47 @@ export function initDatabase(): void {
       FOREIGN KEY (esame_id) REFERENCES esami(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS task_studio (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      esame_id INTEGER NOT NULL,
+      nome TEXT NOT NULL,
+      difficolta INTEGER NOT NULL DEFAULT 5,
+      ore_stimate REAL NOT NULL DEFAULT 2.0,
+      completato INTEGER NOT NULL DEFAULT 0,
+      FOREIGN KEY (esame_id) REFERENCES esami(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS blocchi_occupati (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      data TEXT NOT NULL,
+      ora_inizio TEXT NOT NULL,
+      ora_fine TEXT NOT NULL,
+      etichetta TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS flashcard (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       esame_id INTEGER NOT NULL,
-      fronte TEXT NOT NULL,
-      retro TEXT NOT NULL DEFAULT '',
-      retro_foto TEXT,
+      domanda TEXT NOT NULL,
+      risposta TEXT NOT NULL,
+      created_at TEXT NOT NULL,
       FOREIGN KEY (esame_id) REFERENCES esami(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS piano_studio (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      task_id INTEGER NOT NULL,
+      data TEXT NOT NULL,
+      ora_inizio TEXT NOT NULL,
+      ora_fine TEXT NOT NULL,
+      ore_pianificate REAL NOT NULL,
+      FOREIGN KEY (task_id) REFERENCES task_studio(id) ON DELETE CASCADE
     );
   `);
 
   // Migrazioni
   try { db().runSync('ALTER TABLE esami ADD COLUMN professore TEXT;'); } catch {}
+  try { db().runSync('ALTER TABLE esami ADD COLUMN data_esame TEXT;'); } catch {}
   try { db().runSync('ALTER TABLE lezioni ADD COLUMN esame_id INTEGER NOT NULL DEFAULT 0;'); } catch {}
   try { db().runSync('ALTER TABLE lezioni DROP COLUMN nome;'); } catch {}
   try { db().runSync('ALTER TABLE lezioni DROP COLUMN professore;'); } catch {}
@@ -120,6 +153,10 @@ export function updateEsameVoto(id: number, voto: number): void {
     'UPDATE esami SET voto_finale = ?, superato = 1 WHERE id = ?',
     voto, id
   );
+}
+
+export function updateEsameDataEsame(id: number, dataEsame: string | null): void {
+  db().runSync('UPDATE esami SET data_esame = ? WHERE id = ?', dataEsame, id);
 }
 
 export function deleteEsame(id: number): void {
@@ -198,6 +235,13 @@ export function getSessioniOggiTotali(): number {
   )?.cnt ?? 0;
 }
 
+export function getMinutiStudioOggi(fromTs: string): number {
+  return db().getFirstSync<{ tot: number }>(
+    'SELECT COALESCE(SUM(durata_minuti), 0) as tot FROM sessioni_studio WHERE data >= ?',
+    fromTs
+  )?.tot ?? 0;
+}
+
 // --- Lezioni ---
 
 export function getAllLezioniConEsame(): LezioneConEsame[] {
@@ -244,7 +288,7 @@ export function getMediaPonderata(extraVoti?: { voto: number; cfu: number }[]): 
   const all = [...esami, ...(extraVoti ?? [])];
   if (all.length === 0) return 0;
   const sumCfu = all.reduce((s, e) => s + e.cfu, 0);
-  const sumPeso = all.reduce((s, e) => s + e.voto * e.cfu, 0);
+  const sumPeso = all.reduce((s, e) => s + (e.voto === 33 ? 30 : e.voto) * e.cfu, 0);
   return Math.round((sumPeso / sumCfu) * 100) / 100;
 }
 
@@ -260,28 +304,226 @@ export function getEsamiSuperati(): Esame[] {
   );
 }
 
-// --- Flashcard ---
+// --- Task studio ---
 
-export function resetAllData(): void {
-  db().execSync(
-    'DELETE FROM flashcard; DELETE FROM sessioni_studio; DELETE FROM lezioni; DELETE FROM moduli; DELETE FROM esami;'
-  );
-}
-
-export function getFlashcard(esameId: number): Flashcard[] {
-  return db().getAllSync<Flashcard>(
-    'SELECT * FROM flashcard WHERE esame_id = ? ORDER BY id ASC',
+export function getTaskStudio(esameId: number): TaskStudio[] {
+  return db().getAllSync<TaskStudio>(
+    'SELECT * FROM task_studio WHERE esame_id = ? ORDER BY completato ASC, id ASC',
     esameId
   );
 }
 
-export function insertFlashcard(esameId: number, fronte: string, retro: string, retro_foto?: string): void {
+export function insertTaskStudio(
+  esameId: number,
+  nome: string,
+  difficolta: number,
+  ore_stimate: number
+): void {
   db().runSync(
-    'INSERT INTO flashcard (esame_id, fronte, retro, retro_foto) VALUES (?, ?, ?, ?)',
-    esameId, fronte, retro, retro_foto ?? null
+    'INSERT INTO task_studio (esame_id, nome, difficolta, ore_stimate, completato) VALUES (?, ?, ?, ?, 0)',
+    esameId, nome, difficolta, ore_stimate
+  );
+}
+
+export function toggleTaskStudio(id: number, completato: 0 | 1): void {
+  db().runSync('UPDATE task_studio SET completato = ? WHERE id = ?', completato, id);
+}
+
+export function deleteTaskStudio(id: number): void {
+  db().runSync('DELETE FROM task_studio WHERE id = ?', id);
+}
+
+// --- Blocchi occupati ---
+
+export function getBlocchiOccupati(): BloccoOccupato[] {
+  return db().getAllSync<BloccoOccupato>(
+    'SELECT * FROM blocchi_occupati ORDER BY data ASC, ora_inizio ASC'
+  );
+}
+
+export function insertBlocco(
+  data: string,
+  ora_inizio: string,
+  ora_fine: string,
+  etichetta?: string
+): void {
+  db().runSync(
+    'INSERT INTO blocchi_occupati (data, ora_inizio, ora_fine, etichetta) VALUES (?, ?, ?, ?)',
+    data, ora_inizio, ora_fine, etichetta ?? null
+  );
+}
+
+export function deleteBlocco(id: number): void {
+  db().runSync('DELETE FROM blocchi_occupati WHERE id = ?', id);
+}
+
+// --- Piano studio ---
+
+export function getPianoSessioni(): PianoSessioneConTask[] {
+  const today = new Date().toISOString().slice(0, 10);
+  return db().getAllSync<PianoSessioneConTask>(`
+    SELECT p.*, t.nome AS nome_task, t.difficolta, e.nome AS nome_esame
+    FROM piano_studio p
+    JOIN task_studio t ON t.id = p.task_id
+    JOIN esami e ON e.id = t.esame_id
+    WHERE p.data >= ?
+    ORDER BY p.data ASC, p.ora_inizio ASC
+  `, today);
+}
+
+function _timeToMins(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function _minsToTime(m: number): string {
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}
+
+function _getFreeSlots(
+  date: Date,
+  blocchi: BloccoOccupato[],
+  lezioni: Lezione[],
+  dayStart: number,
+  dayEnd: number
+): Array<{ start: number; end: number }> {
+  const dateStr = date.toISOString().slice(0, 10);
+  const dbGiorno = (date.getDay() + 6) % 7;
+
+  const occupied = [
+    ...lezioni
+      .filter((l) => l.giorno === dbGiorno)
+      .map((l) => ({ start: _timeToMins(l.ora_inizio), end: _timeToMins(l.ora_fine) })),
+    ...blocchi
+      .filter((b) => b.data === dateStr)
+      .map((b) => ({ start: _timeToMins(b.ora_inizio), end: _timeToMins(b.ora_fine) })),
+  ].sort((a, b) => a.start - b.start);
+
+  const merged: Array<{ start: number; end: number }> = [];
+  for (const s of occupied) {
+    if (merged.length > 0 && s.start <= merged[merged.length - 1].end) {
+      merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, s.end);
+    } else {
+      merged.push({ ...s });
+    }
+  }
+
+  const free: Array<{ start: number; end: number }> = [];
+  let cur = dayStart;
+  for (const occ of merged) {
+    if (occ.start > cur) free.push({ start: cur, end: Math.min(occ.start, dayEnd) });
+    cur = Math.max(cur, occ.end);
+    if (cur >= dayEnd) break;
+  }
+  if (cur < dayEnd) free.push({ start: cur, end: dayEnd });
+  return free;
+}
+
+function _placeSession(
+  free: Array<{ start: number; end: number }>,
+  prevEnd: number,
+  minRimanenti: number,
+  budget: number
+): { start: number; end: number } | null {
+  const toSchedule = Math.min(minRimanenti, budget);
+  for (const slot of free) {
+    const start = Math.max(slot.start, prevEnd);
+    if (start >= slot.end) continue;
+    const dur = Math.min(toSchedule, slot.end - start);
+    if (dur <= 0) continue;
+    return { start, end: start + dur };
+  }
+  return null;
+}
+
+export function generatePiano(): void {
+  db().runSync('DELETE FROM piano_studio');
+
+  const tasks = db().getAllSync<TaskConEsame>(`
+    SELECT t.*, e.nome AS nome_esame, e.data_esame, e.cfu
+    FROM task_studio t
+    JOIN esami e ON e.id = t.esame_id
+    WHERE t.completato = 0
+    ORDER BY COALESCE(e.data_esame, '9999-12-31') ASC, t.difficolta DESC
+  `);
+
+  if (tasks.length === 0) return;
+
+  const allBlocchi = db().getAllSync<BloccoOccupato>('SELECT * FROM blocchi_occupati');
+  const allLezioni = db().getAllSync<Lezione>('SELECT * FROM lezioni');
+
+  const DEEP_WORK_MAX = 240;
+  const DAY_START = 8 * 60;
+  const DAY_END = 22 * 60;
+
+  const minPerGiorno: Record<string, number> = {};
+  const lastEndPerGiorno: Record<string, number> = {};
+
+  for (const task of tasks) {
+    let minRimanenti = Math.round(task.ore_stimate * 60);
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    let safety = 0;
+
+    while (minRimanenti > 0 && safety < 120) {
+      safety++;
+      const dateStr = d.toISOString().slice(0, 10);
+      if (task.data_esame && dateStr > task.data_esame) break;
+
+      const budget = DEEP_WORK_MAX - (minPerGiorno[dateStr] ?? 0);
+      if (budget > 0) {
+        const free = _getFreeSlots(d, allBlocchi, allLezioni, DAY_START, DAY_END);
+        const prevEnd = lastEndPerGiorno[dateStr] ?? DAY_START;
+        const sess = _placeSession(free, prevEnd, minRimanenti, budget);
+
+        if (sess) {
+          const dur = sess.end - sess.start;
+          db().runSync(
+            'INSERT INTO piano_studio (task_id, data, ora_inizio, ora_fine, ore_pianificate) VALUES (?, ?, ?, ?, ?)',
+            task.id, dateStr, _minsToTime(sess.start), _minsToTime(sess.end), dur / 60
+          );
+          minPerGiorno[dateStr] = (minPerGiorno[dateStr] ?? 0) + dur;
+          lastEndPerGiorno[dateStr] = sess.end;
+          minRimanenti -= dur;
+        }
+      }
+
+      d.setDate(d.getDate() + 1);
+    }
+  }
+}
+
+// --- Flashcard ---
+
+export function getFlashcard(esameId: number): Flashcard[] {
+  return db().getAllSync<Flashcard>(
+    'SELECT * FROM flashcard WHERE esame_id = ? ORDER BY created_at ASC',
+    esameId
+  );
+}
+
+export function countFlashcard(esameId: number): number {
+  return db().getFirstSync<{ n: number }>(
+    'SELECT COUNT(*) as n FROM flashcard WHERE esame_id = ?',
+    esameId
+  )?.n ?? 0;
+}
+
+export function insertFlashcard(esameId: number, domanda: string, risposta: string): void {
+  db().runSync(
+    'INSERT INTO flashcard (esame_id, domanda, risposta, created_at) VALUES (?, ?, ?, ?)',
+    esameId, domanda, risposta, new Date().toISOString()
   );
 }
 
 export function deleteFlashcard(id: number): void {
   db().runSync('DELETE FROM flashcard WHERE id = ?', id);
+}
+
+// --- Reset ---
+
+export function resetAllData(): void {
+  db().execSync(
+    'DELETE FROM flashcard; DELETE FROM piano_studio; DELETE FROM task_studio; DELETE FROM blocchi_occupati; DELETE FROM sessioni_studio; DELETE FROM lezioni; DELETE FROM moduli; DELETE FROM esami;'
+  );
 }

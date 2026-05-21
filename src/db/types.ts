@@ -11,6 +11,7 @@ export interface Esame {
   ore_tirocinio_target: number | null;
   superato: 0 | 1;
   created_at: string;
+  data_esame: string | null;
 }
 
 export interface Modulo {
@@ -32,11 +33,11 @@ export interface SessioneStudio {
 export interface Lezione {
   id: number;
   esame_id: number;
-  giorno: number; // 0=Lunedì … 4=Venerdì
-  ora_inizio: string; // "09:00"
-  ora_fine: string;   // "11:00"
+  giorno: number;
+  ora_inizio: string;
+  ora_fine: string;
   aula: string;
-  colore: string;     // hex
+  colore: string;
 }
 
 export interface LezioneConEsame extends Lezione {
@@ -44,10 +45,48 @@ export interface LezioneConEsame extends Lezione {
   professore: string | null;
 }
 
+export interface TaskStudio {
+  id: number;
+  esame_id: number;
+  nome: string;
+  difficolta: number;
+  ore_stimate: number;
+  completato: 0 | 1;
+}
+
+export interface TaskConEsame extends TaskStudio {
+  nome_esame: string;
+  data_esame: string | null;
+  cfu: number;
+}
+
+export interface BloccoOccupato {
+  id: number;
+  data: string;
+  ora_inizio: string;
+  ora_fine: string;
+  etichetta: string | null;
+}
+
+export interface PianoSessione {
+  id: number;
+  task_id: number;
+  data: string;
+  ora_inizio: string;
+  ora_fine: string;
+  ore_pianificate: number;
+}
+
+export interface PianoSessioneConTask extends PianoSessione {
+  nome_task: string;
+  nome_esame: string;
+  difficolta: number;
+}
+
 export interface Flashcard {
   id: number;
   esame_id: number;
-  fronte: string;
-  retro: string;
-  retro_foto: string | null;
+  domanda: string;
+  risposta: string;
+  created_at: string;
 }

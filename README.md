@@ -1,177 +1,108 @@
-# HelloWorldApp — Expo + TypeScript
+# UniVersal — App universitaria (Expo + TypeScript)
 
-Progetto Expo Managed Workflow con TypeScript, pronto per sviluppo su Windows e test via Expo Go su iPhone.
-
----
-
-## Struttura del Progetto
-
-```
-hello-world-app/
-├── .github/
-│   └── workflows/
-│       └── eas-build.yml       # Pipeline CI/CD GitHub Actions
-├── assets/
-│   ├── icon.png                # Icona app (1024x1024)
-│   ├── splash-icon.png         # Splash screen (200x200)
-│   ├── adaptive-icon.png       # Icona Android adaptive (1024x1024)
-│   └── favicon.png             # Favicon web (48x48)
-├── src/                        # Cartella per componenti futuri
-│   ├── components/
-│   ├── screens/
-│   └── constants/
-├── .gitignore
-├── App.tsx                     # Entry point dell'applicazione
-├── app.json                    # Configurazione Expo
-├── babel.config.js
-├── eas.json                    # Configurazione EAS Build
-├── package.json
-└── tsconfig.json
-```
+Tracker universitario per iOS/Android costruito con Expo Router, SQLite locale e React Native Paper. Estetica Nothing Phone (font dot-matrix, dark/light mode).
 
 ---
 
-## Guida Comandi Windows (PowerShell / CMD)
+## Funzionalità
 
-### FASE 1 — Prerequisiti (una tantum)
+- **Dashboard** — countdown alla laurea, progress CFU, media ponderata, radar esami in sospeso
+- **Esami** — lista esami con voto, CFU, tipo (voto/tirocinio), swipe-to-delete, aggiunta rapida
+- **Dettaglio esame** — task (scritto/orale/progetto/ore), orario lezioni settimanale, timer studio, registrazione voto con lode
+- **Orario** — vista settimanale aggregata di tutte le lezioni
+- **Simulatore** — sliding doors (voti ipotetici), calcolatore target media, conversione /110
+- **Pianificatore** — task di studio per esame (nome, difficoltà 1-10, ore stimate), blocchi orari occupati, algoritmo greedy che genera un piano giornaliero rispettando il limite 4h Deep Work/giorno
+- **Studio / Personal Trainer** — Pomodoro personalizzabile (focus + pausa configurabili), budget Deep Work giornaliero da 4h (Cal Newport), Shallow Zone con cambio colori quando il budget è esaurito, reset manuale del budget; sezione Flashcard con accesso ai deck per esame
+- **Flashcard** — deck per esame con domanda/risposta, navigazione prev/next, tap-to-flip, aggiunta/eliminazione carte, lista completa con swipe-to-delete
+- **Esami — Import massivo** — incolla più esami in formato "Nome CFU [tirocinio]" (uno per riga) per importarli tutti in un colpo solo
+- **Impostazioni** — data laurea, CFU totali, tema
 
-Installa Node.js LTS da https://nodejs.org (include npm).
-Poi installa gli strumenti globali:
+---
 
-```powershell
-npm install -g expo-cli eas-cli
+## Stack tecnico
+
+| Cosa | Tecnologia |
+|---|---|
+| Framework | Expo SDK (Managed Workflow) |
+| Navigazione | expo-router (file-based) |
+| Database | expo-sqlite (SQLite locale, sync API) |
+| UI | React Native Paper + SafeAreaContext |
+| Icone | @expo/vector-icons (MaterialCommunityIcons) |
+| Tema | React Native Paper theming + hook `useColors` custom |
+| Font | Dot-matrix custom (`fonts.dot`, `fonts.mono`) |
+| Linguaggio | TypeScript strict |
+
+---
+
+## Struttura
+
 ```
+app/
+├── (tabs)/
+│   ├── index.tsx          # Dashboard
+│   ├── esami.tsx          # Lista esami + import massivo
+│   ├── orario.tsx         # Vista settimanale lezioni + pianificatore
+│   ├── simulatore.tsx     # Simulatore media
+│   ├── studio.tsx         # Timer sessioni di studio + flashcard list
+│   └── _layout.tsx        # Tab bar
+├── esame/[id].tsx         # Dettaglio esame
+├── flashcard/[esameId].tsx # Deck flashcard per esame
+├── impostazioni.tsx
+└── _layout.tsx            # Root layout (PaperProvider, SQLite init)
 
-Verifica l'installazione:
-
-```powershell
-node --version
-npm --version
-expo --version
-eas --version
+src/
+├── db/
+│   ├── database.ts        # Tutte le funzioni SQLite (init, CRUD, stats)
+│   └── types.ts           # Tipi TypeScript (Esame, Modulo, Lezione, ...)
+├── components/
+│   └── SwipeableRow.tsx   # Swipe-to-delete generico
+└── theme.ts               # Colori, font, hook useColors
 ```
 
 ---
 
-### FASE 2 — Inizializzare la cartella del progetto
+## Schema DB
 
-Crea la cartella, entra e copia tutti i file di questo repository:
-
-```powershell
-mkdir hello-world-app
-cd hello-world-app
+```sql
+esami          (id, nome, cfu, tipo, voto_finale, ore_tirocinio_target, superato, created_at, professore, data_esame)
+moduli         (id, esame_id, nome, tipo, completato, ore_completate)
+sessioni_studio(id, esame_id, durata_minuti, data)
+lezioni        (id, esame_id, giorno, ora_inizio, ora_fine, aula, colore)
+impostazioni   (chiave, valore)
+task_studio    (id, esame_id, nome, difficolta, ore_stimate, completato)
+blocchi_occupati(id, data, ora_inizio, ora_fine, etichetta)
+piano_studio   (id, task_id, data, ora_inizio, ora_fine, ore_pianificate)
+flashcard      (id, esame_id, domanda, risposta, created_at)
 ```
 
-Crea manualmente le sottocartelle necessarie:
+> **30 con lode** è salvato come `voto_finale = 33` e mostrato come `30L`. La media ponderata normalizza automaticamente 33 → 30 prima del calcolo.
 
-```powershell
-mkdir assets
-mkdir src\components
-mkdir src\screens
-mkdir src\constants
-mkdir .github\workflows
-```
+> **Personal Trainer**: al primo accesso alla tab Studio compare un manifesto con la filosofia Deep Work. Le impostazioni `pomodoro_lavoro`, `pomodoro_pausa`, `trainer_visto` e `deep_work_reset_ts` sono salvate nella tabella `impostazioni`.
 
-Copia tutti i file (.gitignore, App.tsx, app.json, package.json, tsconfig.json,
-babel.config.js, eas.json, .github\workflows\eas-build.yml) nella cartella.
-
-> NOTA ASSET: Expo richiede le immagini in `assets/`. Puoi creare placeholder
-> con qualsiasi editor grafico o usare immagini PNG minimali per lo sviluppo.
-> Dimensioni consigliate: icon.png 1024x1024, splash-icon.png 200x200.
+> **Pianificatore**: l'algoritmo greedy ordina i task per `(data_esame ASC, difficoltà DESC)`, poi per ogni giorno riempie gli slot liberi (08:00–22:00 meno lezioni settimanali meno blocchi occupati) fino a 4h di Deep Work. `piano_studio` è rigenerabile in qualsiasi momento tramite `generatePiano()`. La deadline è `data_esame` dell'esame associato al task.
 
 ---
 
-### FASE 3 — Installare le dipendenze
+## Avvio sviluppo
 
-```powershell
+```bash
 npm install
-```
-
----
-
-### FASE 4 — Avviare il server di sviluppo (test su iPhone con Expo Go)
-
-1. Installa **Expo Go** dall'App Store sul tuo iPhone.
-2. Assicurati che iPhone e PC siano sulla **stessa rete Wi-Fi**.
-3. Avvia il server:
-
-```powershell
 npx expo start
 ```
 
-4. Nel terminale apparirà un **QR Code**: aprilo con la fotocamera dell'iPhone
-   oppure direttamente dall'app Expo Go (`Scan QR Code`).
+Scansiona il QR con Expo Go (iPhone/Android sulla stessa rete Wi-Fi).
 
-Per forzare la modalità tunnel (se la rete blocca le connessioni locali):
+### Type check
 
-```powershell
-npx expo start --tunnel
-```
-
----
-
-### FASE 5 — Type check e lint
-
-```powershell
-# Verifica TypeScript senza compilare
+```bash
 npx tsc --noEmit
-
-# Lint del codice
-npx eslint . --ext .ts,.tsx
 ```
 
 ---
 
-### FASE 6 — Inizializzare il repository Git e pushare su GitHub
+## Note implementative
 
-```powershell
-git init
-git add .
-git commit -m "feat: initial Expo TypeScript project setup"
-```
-
-Crea un nuovo repository su GitHub (senza README/license/gitignore pre-generati),
-poi collega e pusha:
-
-```powershell
-git remote add origin https://github.com/TUO_USERNAME/hello-world-app.git
-git branch -M main
-git push -u origin main
-```
-
-Il push su `main` attiverà automaticamente la GitHub Action **EAS iOS Build**.
-
----
-
-### FASE 7 — Configurare il Secret EXPO_TOKEN per la CI/CD
-
-Prima del primo push, aggiungi il token EAS come secret GitHub:
-
-1. Vai su https://expo.dev → Account → Access Tokens → crea un nuovo token.
-2. Nel repository GitHub → Settings → Secrets and variables → Actions.
-3. Aggiungi un nuovo secret con nome `EXPO_TOKEN` e incolla il valore del token.
-
-La pipeline `.github/workflows/eas-build.yml` usa questo secret per autenticarsi
-con EAS e avviare la build iOS remota.
-
----
-
-### FASE 8 — Login EAS (per build manuali da locale)
-
-```powershell
-eas login
-eas build:configure
-eas build --platform ios --profile preview
-```
-
----
-
-## Note Importanti
-
-- **bundleIdentifier** in `app.json` → sostituisci `com.yourname.helloworldapp`
-  con il tuo identificatore univoco in stile reverse-domain.
-- **eas.json submit** → aggiorna `appleId`, `ascAppId` e `appleTeamId` solo
-  quando sei pronto per la submission all'App Store.
-- La build EAS richiede un account Expo (gratuito su https://expo.dev).
-- Con Expo Go puoi testare senza un account Apple Developer ($99/anno);
-  il Developer Account è necessario solo per distribuire sull'App Store.
+- La media ponderata usa `(Σ voto_i × cfu_i) / Σ cfu_i`, dove 30L conta come 30.
+- `superato = 1` marca un esame come passato; gli esami di tipo `tirocinio` non entrano nella media.
+- Le lezioni sono collegate all'esame via `esame_id` (FK con CASCADE DELETE).
+- Il tema segue `useColorScheme()` di React Native con override manuale nelle impostazioni.

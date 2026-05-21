@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -12,12 +12,17 @@ interface Props {
 export function SwipeableRow({ children, onDelete, style }: Props) {
   const ref = useRef<Swipeable>(null);
 
+  function handleDelete() {
+    ref.current?.close();
+    onDelete();
+  }
+
   function renderRightAction() {
     return (
-      <View style={s.action}>
+      <TouchableOpacity style={s.action} onPress={handleDelete} activeOpacity={0.8}>
         <MaterialCommunityIcons name="trash-can-outline" size={22} color="#FFFFFF" />
         <Text style={s.label}>ELIMINA</Text>
-      </View>
+      </TouchableOpacity>
     );
   }
 
@@ -25,12 +30,9 @@ export function SwipeableRow({ children, onDelete, style }: Props) {
     <View style={[s.outer, style]}>
       <Swipeable
         ref={ref}
-        friction={1.5}
-        rightThreshold={60}
+        friction={2}
+        rightThreshold={80}
         renderRightActions={renderRightAction}
-        onSwipeableOpen={(direction) => {
-          if (direction === 'right') onDelete();
-        }}
         overshootRight={false}
       >
         {children}

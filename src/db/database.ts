@@ -238,7 +238,8 @@ export function deleteLezione(id: number): void {
 
 export function getMediaPonderata(extraVoti?: { voto: number; cfu: number }[]): number {
   const esami = db().getAllSync<{ voto: number; cfu: number }>(
-    'SELECT voto_finale as voto, cfu FROM esami WHERE superato = 1 AND tipo = "voto" AND voto_finale IS NOT NULL'
+    'SELECT voto_finale as voto, cfu FROM esami WHERE superato = 1 AND tipo = ? AND voto_finale IS NOT NULL',
+    'voto'
   );
   const all = [...esami, ...(extraVoti ?? [])];
   if (all.length === 0) return 0;
